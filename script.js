@@ -95,18 +95,9 @@ const services = {
   "visa-nacional-estudios": emptyService("Visa Nacional de Estudios"),
   "visa-nacional-reagrupacion-comunitaria": emptyService("Visa Nacional de Reagrupación Comunitaria"),
   "visa-nacional-recuperacion-residencia": emptyService("Visa Nacional Recuperación de Tarjeta de Residencia"),
-  vuelos: {
-    title: "Vuelos",
-    empty: true
-  },
-  tours: {
-    title: "Tours",
-    empty: true
-  },
-  seguros: {
-    title: "Seguros",
-    empty: true
-  }
+  vuelos: emptyService("Vuelos"),
+  tours: emptyService("Tours"),
+  seguros: emptyService("Seguros")
 };
 
 const sheet = document.querySelector("#serviceSheet");
