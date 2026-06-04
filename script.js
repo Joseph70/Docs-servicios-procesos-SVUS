@@ -1,9 +1,42 @@
-const services = {
-  "visa-americana": {
-    title: "Visa Americana B1/B2",
+function emptyService(title) {
+  return {
+    title,
     badge: "Servicio activo",
     summary: [
-      ["Qué es", "Asesoría y gestión para la obtención o renovación de Visa Americana B1/B2."],
+      ["Qué es", ""],
+      ["Objetivo", ""],
+      ["Modalidad", ""],
+      ["Duración", ""]
+    ],
+    prices: [
+      ["Servicio Agencia", ""],
+      ["Tasa Consular", ""],
+      ["Total Cliente", ""]
+    ],
+    promos: [""],
+    requirements: [""],
+    includes: [""],
+    process: [
+      ["Captación y asesoría", ""],
+      ["Recepción documentos", ""],
+      ["Llenado formulario", ""],
+      ["Pago consular", ""],
+      ["Agendamiento cita", ""],
+      ["Preparación entrevista", ""],
+      ["Espera de cita", ""],
+      ["Resultado final", ""]
+    ],
+    deliverables: [""],
+    observations: [""]
+  };
+}
+
+const services = {
+  "visa-americana": {
+    title: "Visa Americana B1/B2 (Negocios y Turismo)",
+    badge: "Servicio activo",
+    summary: [
+      ["Qué es", "Asesoría y gestión para la obtención o renovación de Visa Americana B1/B2 (Negocios y Turismo)."],
       ["Objetivo", "Facilitar el proceso y reducir errores en la solicitud."],
       ["Modalidad", "Presencial / Virtual"],
       ["Duración", "15 a 45 días promedio"]
@@ -56,10 +89,12 @@ const services = {
       "La agencia no garantiza aprobación."
     ]
   },
-  "visa-schengen": {
-    title: "Visa Schengen",
-    empty: true
-  },
+  "visa-americana-f1": emptyService("Visa Americana F1 (Estudios)"),
+  "visa-schengen": emptyService("Visa Schengen (Corta Estancia)"),
+  "visa-nacional-trabajo": emptyService("Visa Nacional de Trabajo"),
+  "visa-nacional-estudios": emptyService("Visa Nacional de Estudios"),
+  "visa-nacional-reagrupacion-comunitaria": emptyService("Visa Nacional de Reagrupación Comunitaria"),
+  "visa-nacional-recuperacion-residencia": emptyService("Visa Nacional Recuperación de Tarjeta de Residencia"),
   vuelos: {
     title: "Vuelos",
     empty: true
@@ -81,6 +116,7 @@ const editButton = document.querySelector("#editButton");
 const saveButton = document.querySelector("#saveButton");
 const themeToggle = document.querySelector("#themeToggle");
 const printButton = document.querySelector("#printButton");
+const wordButton = document.querySelector("#wordButton");
 const screenLogoSrc = "logo-blanco-transparente.png";
 const printLogoSrc = "logo-impresion-color.png";
 let activeService = "visa-americana";
@@ -91,6 +127,7 @@ let draggedLine = null;
 const dragReadyCards = new WeakSet();
 const undoHistory = {};
 const maxUndoSteps = 40;
+const wordMimeType = "application/msword;charset=utf-8";
 
 const defaultLayouts = [
   { className: "summary-section", left: 0, top: 0, width: 34, height: 25 },
@@ -103,6 +140,10 @@ const defaultLayouts = [
 
 function serviceStorageKey(key) {
   return `svus-sheet-${key}`;
+}
+
+function serviceWordStorageKey(key) {
+  return `svus-word-${key}`;
 }
 
 function editableText(text, tag = "span") {
@@ -202,6 +243,15 @@ function applyCardLayout(card, layout) {
   card.style.height = `${layout.height}%`;
 }
 
+function sheetPageMarkup(index, content = "") {
+  return `
+    <section class="sheet-page" data-page="${index}">
+      <div class="sheet-page-label">Hoja ${index}</div>
+      <div class="sheet-grid free-canvas">${content}</div>
+    </section>
+  `;
+}
+
 function normalizeCanvasLayout(canvas) {
   const baseWidth = 1060;
   const baseHeight = 640;
@@ -249,6 +299,90 @@ function restoreSheetLogoAfterPrint() {
   });
 }
 
+function ensureSheetPages() {
+  let pages = sheet.querySelector(".sheet-pages");
+
+  if (!pages) {
+    const canvases = Array.from(sheet.querySelectorAll(".sheet-grid"));
+    pages = document.createElement("div");
+    pages.className = "sheet-pages";
+
+    canvases.forEach((canvas, index) => {
+      const page = document.createElement("section");
+      page.className = "sheet-page";
+      page.dataset.page = String(index + 1);
+
+      const label = document.createElement("div");
+      label.className = "sheet-page-label";
+      label.textContent = `Hoja ${index + 1}`;
+
+      canvas.classList.add("free-canvas");
+      page.append(label, canvas);
+      pages.appendChild(page);
+    });
+
+    if (!pages.children.length) {
+      pages.innerHTML = sheetPageMarkup(1);
+    }
+
+    sheet.appendChild(pages);
+  }
+
+  pages.querySelectorAll(".sheet-page").forEach((page, index) => {
+    page.dataset.page = String(index + 1);
+
+    let label = page.querySelector(":scope > .sheet-page-label");
+    if (!label) {
+      label = document.createElement("div");
+      label.className = "sheet-page-label";
+      page.prepend(label);
+    }
+    label.textContent = `Hoja ${index + 1}`;
+
+    const canvas = page.querySelector(":scope > .sheet-grid");
+    if (canvas) {
+      canvas.classList.add("free-canvas");
+    }
+  });
+
+  let addButton = sheet.querySelector(":scope > .add-page-button");
+  if (!addButton) {
+    addButton = document.createElement("button");
+    addButton.className = "add-page-button";
+    addButton.type = "button";
+    addButton.setAttribute("aria-label", "Crear nueva hoja");
+    addButton.title = "Crear nueva hoja";
+    addButton.textContent = "+";
+    sheet.appendChild(addButton);
+  }
+}
+
+function migrateServiceMarkup(key, service) {
+  const title = sheet.querySelector(".sheet-title");
+  if (title) {
+    title.textContent = service.title;
+  }
+
+  const replacements = {
+    "visa-americana": [
+      ["Visa Americana B1/B2 (Negocios y Turismo)", service.title],
+      ["Visa Americana B1/B2", service.title]
+    ],
+    "visa-schengen": [
+      ["Visa Schengen (Corta Estancia)", service.title],
+      ["Visa Schengen", service.title]
+    ]
+  };
+
+  (replacements[key] || []).forEach(([from, to]) => {
+    sheet.querySelectorAll(".editable").forEach((element) => {
+      if (element.textContent.includes(from) && element.textContent !== to) {
+        element.textContent = element.textContent.split(from).join(to);
+      }
+    });
+  });
+}
+
 function stripLineEditingControls(root = sheet) {
   root.querySelectorAll(".line-add-button").forEach((button) => button.remove());
   root.querySelectorAll(".line-editable").forEach((element) => {
@@ -261,6 +395,7 @@ function stripLineEditingControls(root = sheet) {
 function cleanSheetMarkup() {
   const clone = sheet.cloneNode(true);
   stripLineEditingControls(clone);
+  clone.querySelectorAll(".add-page-button").forEach((button) => button.remove());
   clone.querySelectorAll(".editable").forEach((element) => {
     element.removeAttribute("contenteditable");
     element.removeAttribute("spellcheck");
@@ -269,8 +404,81 @@ function cleanSheetMarkup() {
   return clone.innerHTML;
 }
 
+function escapeHtml(text) {
+  return String(text)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function sanitizeFileName(text) {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase() || "ficha-servicio";
+}
+
+function buildWordDocumentHtml() {
+  const clone = sheet.cloneNode(true);
+  stripLineEditingControls(clone);
+  clone.querySelectorAll(".add-page-button, .resize-handle").forEach((element) => element.remove());
+  clone.querySelectorAll("[contenteditable], [spellcheck], [data-undo-snapshot]").forEach((element) => {
+    element.removeAttribute("contenteditable");
+    element.removeAttribute("spellcheck");
+    element.removeAttribute("data-undo-snapshot");
+  });
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>${escapeHtml(pageTitle.textContent)}</title>
+      <style>
+        body { font-family: Arial, sans-serif; color: #17324b; }
+        .service-sheet { border-top: 4px solid #f0c753; padding: 18px; }
+        .sheet-header { border-bottom: 1px solid #d7e1eb; margin-bottom: 14px; }
+        .sheet-header img { width: 90px; height: auto; }
+        .sheet-kicker { color: #2c85ac; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+        .sheet-title { color: #b8860f; font-size: 22px; margin: 4px 0 8px; }
+        .sheet-badge, .sheet-page-label { display: inline-block; border: 1px solid #d7e1eb; padding: 5px 8px; font-weight: bold; }
+        .sheet-page { margin: 18px 0; page-break-after: always; }
+        .sheet-page:last-child { page-break-after: auto; }
+        .sheet-grid { position: relative; min-height: 560px; border: 1px solid #d7e1eb; padding: 10px; }
+        .section-card { border: 1px solid #d7e1eb; border-radius: 6px; margin: 8px 0; padding: 8px; position: static !important; width: auto !important; height: auto !important; }
+        .section-card h2, .notes h2 { color: #09233a; background: #f0c753; padding: 4px 7px; display: inline-block; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+        th, td { border-bottom: 1px solid #d7e1eb; padding: 5px; text-align: left; vertical-align: top; }
+        th { color: #31568a; background: #fff7df; }
+        ul { margin: 6px 0 6px 18px; padding: 0; }
+        li { margin: 3px 0; }
+      </style>
+    </head>
+    <body>${clone.outerHTML}</body>
+    </html>
+  `;
+}
+
+function downloadWordDocument() {
+  persistCurrentSheet();
+  const fileName = `${sanitizeFileName(pageTitle.textContent)}.doc`;
+  const blob = new Blob([buildWordDocumentHtml()], { type: wordMimeType });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  URL.revokeObjectURL(link.href);
+  link.remove();
+}
+
 function persistCurrentSheet() {
-  localStorage.setItem(serviceStorageKey(activeService), cleanSheetMarkup());
+  const markup = cleanSheetMarkup();
+  localStorage.setItem(serviceStorageKey(activeService), markup);
+  localStorage.setItem(serviceWordStorageKey(activeService), buildWordDocumentHtml());
 }
 
 function refreshLineEditingTools() {
@@ -356,45 +564,45 @@ function ensureServiceStatusButton() {
 }
 
 function arrangeExistingSections() {
-  const canvas = sheet.querySelector(".sheet-grid");
-  if (!canvas) {
-    return;
-  }
+  ensureSheetPages();
 
-  if (canvas.classList.contains("free-canvas")) {
-    normalizeCanvasLayout(canvas);
-    return;
-  }
-
-  const sections = Array.from(canvas.querySelectorAll(".section-card"));
-  if (!sections.length) {
-    return;
-  }
-
-  const classByTitle = [
-    ["resumen", "summary-section"],
-    ["precios", "prices-section"],
-    ["requisitos", "requirements-section"],
-    ["incluye", "includes-section"],
-    ["proceso", "process-section"],
-    ["entregables", "notes-section"]
-  ];
-
-  sections.forEach((section) => {
-    const title = section.querySelector("h2")?.textContent.toLowerCase() || "";
-    const match = classByTitle.find(([keyword]) => title.includes(keyword));
-    if (match) {
-      section.classList.add(match[1]);
+  sheet.querySelectorAll(".sheet-grid").forEach((canvas) => {
+    if (canvas.classList.contains("free-canvas")) {
+      normalizeCanvasLayout(canvas);
+      return;
     }
-  });
 
-  canvas.className = "sheet-grid free-canvas";
-  canvas.replaceChildren(...sections);
+    const sections = Array.from(canvas.querySelectorAll(".section-card"));
+    if (!sections.length) {
+      canvas.className = "sheet-grid free-canvas";
+      return;
+    }
 
-  sections.forEach((section, index) => {
-    const layout = defaultLayouts.find((item) => section.classList.contains(item.className)) || defaultLayouts[index % defaultLayouts.length];
-    applyCardLayout(section, layout);
-    section.style.zIndex = String(index + 1);
+    const classByTitle = [
+      ["resumen", "summary-section"],
+      ["precios", "prices-section"],
+      ["requisitos", "requirements-section"],
+      ["incluye", "includes-section"],
+      ["proceso", "process-section"],
+      ["entregables", "notes-section"]
+    ];
+
+    sections.forEach((section) => {
+      const title = section.querySelector("h2")?.textContent.toLowerCase() || "";
+      const match = classByTitle.find(([keyword]) => title.includes(keyword));
+      if (match) {
+        section.classList.add(match[1]);
+      }
+    });
+
+    canvas.className = "sheet-grid free-canvas";
+    canvas.replaceChildren(...sections);
+
+    sections.forEach((section, index) => {
+      const layout = defaultLayouts.find((item) => section.classList.contains(item.className)) || defaultLayouts[index % defaultLayouts.length];
+      applyCardLayout(section, layout);
+      section.style.zIndex = String(index + 1);
+    });
   });
 }
 
@@ -435,13 +643,21 @@ function setupDraggableSections() {
       card.classList.add("dragging");
       document.body.classList.add("moving-card");
 
-      const canvas = card.closest(".free-canvas");
+      let canvas = card.closest(".free-canvas");
       const cardRect = card.getBoundingClientRect();
       const pointerOffsetX = event.clientX - cardRect.left;
       const pointerOffsetY = event.clientY - cardRect.top;
       card.setPointerCapture(event.pointerId);
 
       const onPointerMove = (moveEvent) => {
+        const targetCanvas = document.elementsFromPoint(moveEvent.clientX, moveEvent.clientY)
+          .find((element) => element.classList?.contains("free-canvas"));
+
+        if (targetCanvas && targetCanvas !== canvas) {
+          canvas = targetCanvas;
+          canvas.appendChild(card);
+        }
+
         const canvasRect = canvas.getBoundingClientRect();
         const widthPercent = card.getBoundingClientRect().width / canvasRect.width * 100;
         const heightPercent = card.getBoundingClientRect().height / canvasRect.height * 100;
@@ -539,13 +755,15 @@ function renderSheet(key) {
   activeService = key;
   const service = services[key];
   const savedSheet = localStorage.getItem(serviceStorageKey(key));
+  const useSavedSheet = savedSheet && (service.empty || savedSheet.includes("section-card"));
   pageTitle.textContent = service.title;
 
-  if (savedSheet) {
+  if (useSavedSheet) {
     sheet.className = service.empty ? "service-sheet empty-sheet" : "service-sheet";
     sheet.innerHTML = savedSheet;
     stripLineEditingControls();
     ensureServiceStatusButton();
+    migrateServiceMarkup(key, service);
     arrangeExistingSections();
     setEditMode(editMode);
     setupDraggableSections();
@@ -564,6 +782,7 @@ function renderSheet(key) {
       </header>
       <div></div>
     `;
+    ensureSheetPages();
     setEditMode(editMode);
     return;
   }
@@ -579,7 +798,10 @@ function renderSheet(key) {
       <button class="sheet-badge service-status-toggle is-active" type="button" aria-pressed="true" aria-label="Marcar servicio como inactivo" title="Cambiar a servicio inactivo">${service.badge}</button>
     </header>
 
-    <div class="sheet-grid free-canvas">
+    <div class="sheet-pages">
+      <section class="sheet-page" data-page="1">
+        <div class="sheet-page-label">Hoja 1</div>
+        <div class="sheet-grid free-canvas">
       <section class="section-card summary-section" style="left: 0%; top: 0%; width: 34%; height: 25%; z-index: 1;">
         ${editableText("1. Resumen del servicio", "h2")}
         ${tableRows(service.summary, "Campo", "Información", "info-table")}
@@ -619,9 +841,13 @@ function renderSheet(key) {
           </div>
         </div>
       </section>
+        </div>
+      </section>
     </div>
+    <button class="add-page-button" type="button" aria-label="Crear nueva hoja" title="Crear nueva hoja">+</button>
   `;
   ensureServiceStatusButton();
+  ensureSheetPages();
   setEditMode(editMode);
   setupDraggableSections();
   normalizeCanvasLayout(sheet.querySelector(".free-canvas"));
@@ -677,6 +903,25 @@ sheet.addEventListener("focusout", (event) => {
 });
 
 sheet.addEventListener("click", (event) => {
+  const addPageButton = event.target.closest(".add-page-button");
+  if (!addPageButton) {
+    return;
+  }
+
+  event.preventDefault();
+  pushUndoState();
+  ensureSheetPages();
+
+  const pages = sheet.querySelector(".sheet-pages");
+  const nextIndex = pages.querySelectorAll(".sheet-page").length + 1;
+  pages.insertAdjacentHTML("beforeend", sheetPageMarkup(nextIndex));
+  ensureSheetPages();
+  setupDraggableSections();
+  persistCurrentSheet();
+  pages.lastElementChild.scrollIntoView({ behavior: "smooth", block: "nearest" });
+});
+
+sheet.addEventListener("click", (event) => {
   const addButton = event.target.closest(".line-add-button");
   if (!addButton || !editMode) {
     return;
@@ -692,7 +937,7 @@ sheet.addEventListener("click", (event) => {
     }
     const item = document.createElement("li");
     item.className = "editable line-editable";
-    item.textContent = "Nueva linea";
+    item.textContent = "";
     item.contentEditable = "true";
     item.spellcheck = true;
     item.draggable = true;
@@ -719,7 +964,7 @@ sheet.addEventListener("click", (event) => {
     Array.from({ length: columnCount }).forEach((_, index) => {
       const cell = document.createElement("td");
       cell.className = "editable";
-      cell.textContent = index === 0 ? "Nuevo campo" : "Nueva informacion";
+      cell.textContent = "";
       cell.contentEditable = "true";
       cell.spellcheck = true;
       row.appendChild(cell);
@@ -840,6 +1085,8 @@ printButton.addEventListener("click", () => {
   setSheetLogoForPrint();
   window.print();
 });
+
+wordButton?.addEventListener("click", downloadWordDocument);
 
 window.addEventListener("beforeprint", setSheetLogoForPrint);
 window.addEventListener("afterprint", restoreSheetLogoAfterPrint);

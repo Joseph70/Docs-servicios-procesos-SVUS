@@ -246,10 +246,8 @@ button {
   border-top: 4px solid var(--gold);
   box-shadow: var(--shadow);
   padding: 14px 16px;
-  display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 9px;
-  overflow: hidden;
+  display: block;
+  overflow: visible;
 }
 
 .sheet-header {
@@ -257,6 +255,7 @@ button {
   grid-template-columns: 94px 1fr auto;
   gap: 12px;
   align-items: center;
+  margin-bottom: 9px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--panel-line);
 }
@@ -348,6 +347,51 @@ button {
     linear-gradient(90deg, rgba(137, 163, 199, 0.08) 1px, transparent 1px);
   background-size: 28px 28px;
   overflow: hidden;
+}
+
+.sheet-pages {
+  display: grid;
+  gap: 12px;
+}
+
+.sheet-page {
+  display: grid;
+  gap: 6px;
+}
+
+.sheet-page-label {
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--gold-soft), var(--gold));
+  color: var(--blue-dark);
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  box-shadow: 0 5px 12px rgba(184, 134, 15, 0.13);
+}
+
+.add-page-button {
+  width: 100%;
+  min-height: 56px;
+  margin-top: 12px;
+  border: 1px dashed rgba(49, 86, 138, 0.42);
+  border-radius: 9px;
+  background:
+    linear-gradient(135deg, rgba(255, 240, 199, 0.52), rgba(255, 255, 255, 0.86)),
+    var(--sheet);
+  color: var(--blue-mid);
+  font-size: 2rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color 170ms ease, box-shadow 170ms ease, color 170ms ease, transform 170ms ease;
+}
+
+.add-page-button:hover {
+  border-color: rgba(240, 199, 83, 0.95);
+  color: var(--blue-dark);
+  box-shadow: 0 0 18px rgba(240, 199, 83, 0.34);
+  transform: translateY(-1px);
 }
 
 .sheet-column {
@@ -726,6 +770,12 @@ body.dark .section-card {
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
 }
 
+body.dark .add-page-button {
+  background: linear-gradient(135deg, rgba(9, 42, 68, 0.98), rgba(5, 30, 50, 0.96));
+  color: var(--gold-soft);
+  border-color: rgba(255, 240, 199, 0.32);
+}
+
 body.dark .info-table th,
 body.dark .info-table td,
 body.dark .process-table th,
@@ -865,7 +915,8 @@ body.dark .icon-sun {
     background: transparent;
   }
 
-  .line-add-button {
+  .line-add-button,
+  .add-page-button {
     display: none !important;
   }
 
