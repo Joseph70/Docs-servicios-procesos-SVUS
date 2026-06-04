@@ -100,6 +100,11 @@ const services = {
   seguros: emptyService("Seguros")
 };
 
+services["visa-americana-f1"] = {
+  ...JSON.parse(JSON.stringify(services["visa-americana"])),
+  title: "Visa Americana F1 (Estudios)"
+};
+
 const sheet = document.querySelector("#serviceSheet");
 const pageTitle = document.querySelector("#pageTitle");
 const serviceButtons = document.querySelectorAll(".service-button");
@@ -397,23 +402,21 @@ function migrateServiceMarkup(key, service) {
     title.textContent = service.title;
   }
 
-  const replacements = {
-    "visa-americana": [
-      ["Visa Americana B1/B2 (Negocios y Turismo)", service.title],
-      ["Visa Americana B1/B2", service.title]
-    ],
-    "visa-schengen": [
-      ["Visa Schengen (Corta Estancia)", service.title],
-      ["Visa Schengen", service.title]
-    ]
-  };
+  sheet.querySelectorAll(".editable").forEach((element) => {
+    const originalText = element.textContent;
+    let nextText = originalText;
 
-  (replacements[key] || []).forEach(([from, to]) => {
-    sheet.querySelectorAll(".editable").forEach((element) => {
-      if (element.textContent.includes(from) && element.textContent !== to) {
-        element.textContent = element.textContent.split(from).join(to);
-      }
-    });
+    if (key === "visa-americana") {
+      nextText = nextText.replace(/Visa Americana B1\/B2(?:\s*\(Negocios y Turismo\))*/g, service.title);
+    }
+
+    if (key === "visa-schengen") {
+      nextText = nextText.replace(/Visa Schengen(?:\s*\(Corta Estancia\))*/g, service.title);
+    }
+
+    if (nextText !== originalText) {
+      element.textContent = nextText;
+    }
   });
 }
 
@@ -789,7 +792,10 @@ function renderSheet(key) {
   activeService = key;
   const service = services[key];
   const savedSheet = localStorage.getItem(serviceStorageKey(key));
-  const useSavedSheet = savedSheet && (service.empty || savedSheet.includes("section-card"));
+  const shouldRefreshCopiedF1 = key === "visa-americana-f1"
+    && savedSheet
+    && !savedSheet.includes("Asesoría y gestión para la obtención");
+  const useSavedSheet = savedSheet && !shouldRefreshCopiedF1 && (service.empty || savedSheet.includes("section-card"));
   pageTitle.textContent = service.title;
 
   if (useSavedSheet) {
@@ -801,6 +807,7 @@ function renderSheet(key) {
     arrangeExistingSections();
     setEditMode(editMode);
     setupDraggableSections();
+    persistCurrentSheet();
     return;
   }
 
