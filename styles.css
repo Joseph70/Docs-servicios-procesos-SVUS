@@ -910,12 +910,12 @@ body.dark .icon-sun {
   html,
   body {
     width: 284mm;
-    height: 196mm;
+    height: auto;
     min-height: 0;
-    max-height: 196mm;
+    max-height: none;
     margin: 0;
     display: block;
-    overflow: hidden;
+    overflow: visible;
     background: #ffffff !important;
     color: var(--text);
     print-color-adjust: exact;
@@ -957,9 +957,9 @@ body.dark .icon-sun {
   .workspace,
   .sheet-shell {
     padding: 0;
-    overflow: hidden;
+    overflow: visible;
     width: 100%;
-    height: 100%;
+    height: auto;
     max-width: 100%;
     min-height: 0;
   }
@@ -969,13 +969,13 @@ body.dark .icon-sun {
   }
 
   .service-sheet {
-    width: 100%;
+    width: 284mm;
     min-height: 0;
-    height: 100%;
-    max-height: 100%;
+    height: 196mm;
+    max-height: 196mm;
     aspect-ratio: auto;
     margin: 0;
-    padding: 4mm;
+    padding: 3mm;
     box-shadow: none;
     border: 1px solid #d7e1eb;
     border-top: 4px solid var(--gold);
@@ -983,16 +983,67 @@ body.dark .icon-sun {
     page-break-inside: avoid;
     background: #ffffff !important;
     color: var(--text) !important;
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
+    display: block;
     overflow: hidden;
+  }
+
+  .sheet-header {
+    grid-template-columns: 22mm 1fr auto;
+    gap: 3mm;
+    margin-bottom: 2mm;
+    padding-bottom: 2mm;
+  }
+
+  .sheet-header img {
+    width: 20mm;
+    max-height: 14mm;
+  }
+
+  .sheet-kicker {
+    margin-bottom: 1mm;
+    font-size: 6.5pt;
+  }
+
+  .sheet-title {
+    font-size: 13pt;
+    line-height: 1.05;
+  }
+
+  .sheet-badge {
+    padding: 1.5mm 2mm;
+    font-size: 6pt;
+  }
+
+  .sheet-pages {
+    display: block;
+  }
+
+  .sheet-page {
+    display: block;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .sheet-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .sheet-page-label {
+    margin-bottom: 2mm;
+    padding: 1mm 2mm;
+    font-size: 6.5pt;
+    box-shadow: none;
   }
 
   .sheet-grid {
     width: 100%;
-    min-height: 0;
-    max-height: 100%;
-    height: auto;
+    aspect-ratio: auto;
+    min-height: 154mm;
+    height: 154mm;
+    max-height: 154mm;
     align-self: stretch;
     background: transparent;
     overflow: hidden;

@@ -338,6 +338,69 @@ function restoreSheetLogoAfterPrint() {
   });
 }
 
+function stylePercent(element, property, fallback = 0) {
+  const value = Number.parseFloat(element.style[property]);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function restorePrintLayout() {
+  document.body.classList.remove("printing-fit");
+  sheet.querySelectorAll(".section-card[data-print-style]").forEach((card) => {
+    card.style.cssText = card.dataset.printStyle;
+    delete card.dataset.printStyle;
+  });
+}
+
+function fitCanvasesForPrint() {
+  sheet.querySelectorAll(".free-canvas").forEach((canvas) => {
+    const canvasRect = canvas.getBoundingClientRect();
+    const cards = Array.from(canvas.querySelectorAll(".section-card"));
+
+    if (!canvasRect.height || !cards.length) {
+      return;
+    }
+
+    const layouts = cards.map((card) => {
+      if (!card.dataset.printStyle) {
+        card.dataset.printStyle = card.style.cssText;
+      }
+
+      const top = stylePercent(card, "top");
+      const renderedHeight = Math.max(card.getBoundingClientRect().height, card.scrollHeight) / canvasRect.height * 100;
+      const height = Math.max(renderedHeight, 10);
+
+      return {
+        card,
+        top,
+        height
+      };
+    });
+
+    const maxBottom = Math.max(...layouts.map(({ top, height }) => top + height));
+
+    if (maxBottom <= 94) {
+      return;
+    }
+
+    const scale = clamp(94 / maxBottom, 0.42, 1);
+    layouts.forEach(({ card, top }) => {
+      card.style.top = `${Math.max(0, top * scale)}%`;
+    });
+  });
+}
+
+function preparePrintView() {
+  restorePrintLayout();
+  setSheetLogoForPrint();
+  fitCanvasesForPrint();
+  document.body.classList.add("printing-fit");
+}
+
+function restoreAfterPrint() {
+  restorePrintLayout();
+  restoreSheetLogoAfterPrint();
+}
+
 function ensureSheetPages() {
   let pages = sheet.querySelector(".sheet-pages");
 
@@ -1157,14 +1220,14 @@ themeToggle.addEventListener("click", () => {
 });
 
 printButton.addEventListener("click", () => {
-  setSheetLogoForPrint();
+  preparePrintView();
   window.print();
 });
 
 wordButton?.addEventListener("click", downloadWordDocument);
 
-window.addEventListener("beforeprint", setSheetLogoForPrint);
-window.addEventListener("afterprint", restoreSheetLogoAfterPrint);
+window.addEventListener("beforeprint", preparePrintView);
+window.addEventListener("afterprint", restoreAfterPrint);
 
 if (localStorage.getItem("svus-theme") === "dark") {
   document.body.classList.add("dark");
