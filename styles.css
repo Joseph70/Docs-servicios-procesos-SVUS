@@ -971,27 +971,30 @@ body.dark .icon-sun {
   .service-sheet {
     width: 284mm;
     min-height: 0;
-    height: 196mm;
-    max-height: 196mm;
+    height: auto;
+    max-height: none;
     aspect-ratio: auto;
     margin: 0;
-    padding: 3mm;
+    padding: 0;
     box-shadow: none;
-    border: 1px solid #d7e1eb;
-    border-top: 4px solid var(--gold);
-    break-inside: avoid;
-    page-break-inside: avoid;
+    border: 0;
+    break-inside: auto;
+    page-break-inside: auto;
     background: #ffffff !important;
     color: var(--text) !important;
     display: block;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .sheet-header {
+    width: 284mm;
     grid-template-columns: 22mm 1fr auto;
     gap: 3mm;
     margin-bottom: 2mm;
-    padding-bottom: 2mm;
+    padding: 3mm;
+    border: 1px solid #d7e1eb;
+    border-top: 4px solid var(--gold);
+    background: #ffffff !important;
   }
 
   .sheet-header img {
@@ -1019,11 +1022,18 @@ body.dark .icon-sun {
   }
 
   .sheet-page {
+    width: 284mm;
     display: block;
+    padding: 0 3mm 3mm;
+    overflow: hidden;
     break-inside: avoid;
     page-break-inside: avoid;
     break-after: page;
     page-break-after: always;
+  }
+
+  .sheet-page + .sheet-page {
+    padding-top: 3mm;
   }
 
   .sheet-page:last-child {
@@ -1041,12 +1051,18 @@ body.dark .icon-sun {
   .sheet-grid {
     width: 100%;
     aspect-ratio: auto;
-    min-height: 154mm;
-    height: 154mm;
-    max-height: 154mm;
+    min-height: 160mm;
+    height: 160mm;
+    max-height: 160mm;
     align-self: stretch;
     background: transparent;
     overflow: hidden;
+  }
+
+  .sheet-page + .sheet-page .sheet-grid {
+    min-height: 182mm;
+    height: 182mm;
+    max-height: 182mm;
   }
 
   .section-card {
