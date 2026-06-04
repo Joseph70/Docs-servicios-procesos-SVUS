@@ -641,7 +641,11 @@ body.editing .service-sheet {
 }
 
 body.editing .section-card {
-  cursor: text;
+  cursor: text !important;
+}
+
+body.editing .section-card :is(.editable, .editable *, .line-editable, .line-editable *, td, th, li, p, h2, span) {
+  cursor: text !important;
 }
 
 body.editing .section-card:hover {
@@ -650,15 +654,15 @@ body.editing .section-card:hover {
 
 body.editing .resize-handle {
   opacity: 0.28;
-  cursor: default;
+  cursor: default !important;
 }
 
 body.editing .line-editable {
-  cursor: text;
+  cursor: text !important;
 }
 
 body.editing .line-editable:active {
-  cursor: text;
+  cursor: text !important;
 }
 
 body.editing .line-dragging {
