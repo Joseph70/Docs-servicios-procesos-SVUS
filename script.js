@@ -34,6 +34,7 @@ function emptyService(title) {
 const services = {
   "visa-americana": {
     title: "Visa Americana B1/B2 (Negocios y Turismo)",
+    version: "2026-06-04-b1b2-doc-v2",
     badge: "Servicio activo",
     summary: [
       ["Qué es", "Asesoría y gestión para la obtención o renovación de Visa Americana B1/B2 (Negocios y Turismo)."],
@@ -47,7 +48,7 @@ const services = {
       ["Total Cliente", "$250"]
     ],
     promos: [
-      "6% descuento grupos familiares.",
+      "De 65$ 15% descuento a grupos familiares.",
       "Asesoría gratuita."
     ],
     requirements: [
@@ -90,7 +91,75 @@ const services = {
     ]
   },
   "visa-americana-f1": emptyService("Visa Americana F1 (Estudios)"),
-  "visa-schengen": emptyService("Visa Schengen (Corta Estancia)"),
+  "visa-schengen": {
+    title: "Visa Schengen (Corta Estancia)",
+    version: "2026-06-04-schengen-doc-v1",
+    badge: "Servicio activo",
+    summary: [
+      ["Qué es", "Visado Schengen o llamado visado de corta duración se expide cuando el cliente desea viajar al exterior por menos de 90 días."],
+      ["Objetivo", "Facilitar el proceso y reducir errores en la solicitud."],
+      ["Modalidad", "Presencial / Virtual"],
+      ["Duración de cita", "7 a 21 días dependiendo de la necesidad del cliente. Se toma en la plataforma de BLS Quito, excepto familiar de la Unión Europea; en ese caso se solicita mediante correo electrónico."]
+    ],
+    types: [
+      "Turismo: itinerario o reservas de hoteles.",
+      "Visita familiar: carta de invitación.",
+      "Estudios: documento que acredite lo que va a estudiar sin fines de lucro.",
+      "Trabajo: documento que acredite lo que va a realizar, siempre que haya un pago de por medio.",
+      "Familiar de la Unión Europea: válido solo si la persona española se encuentra con alta consular en Ecuador."
+    ],
+    prices: [
+      ["Servicio Agencia", "$250"],
+      ["Tasa Consular", "$170 (20/50/70$ cita BLS + 150 tasa consular)"],
+      ["Total Cliente", "$420"]
+    ],
+    promos: [
+      "6% descuento grupos familiares.",
+      "Asesoría gratuita."
+    ],
+    requirements: [
+      "Cédula, pasaporte vigente y papeleta de votación.",
+      "Certificados bancarios.",
+      "Movimientos bancarios.",
+      "Certificados laborales: certificados de trabajo y roles de pago, o RUC y declaración.",
+      "Arraigos: matrícula vehicular, predios o pólizas.",
+      "Si una persona externa cubre el viaje, se solicita garantía económica. Hijos menores de edad que se presentan con sus padres no aplican."
+    ],
+    includes: [
+      "Cita BLS.",
+      "Formulario BLS.",
+      "Fotografías.",
+      "Reservas aéreas.",
+      "Reserva hotelera. Si tiene carta de invitación, se excluye la reserva hotelera y se ingresa la carta.",
+      "Seguro de viaje con cobertura mínima de 30 000.",
+      "Organización de expediente.",
+      "Capacitación para entrevista.",
+      "Seguimiento del proceso.",
+      "Soporte por WhatsApp."
+    ],
+    process: [
+      ["Cita BLS República Dominicana, El Salvador y Portugal", "Estimado para siguiente semana: 5 a 7 días laborables. Esperar respuesta del BLS: 3 a 5 días."],
+      ["Formulario, fotos 3.5 x 4.5, reserva hotelera, reserva aérea y seguro de viajes", "Alrededor de 2 horas para completar."],
+      ["Captación, asesoría y entrega del expediente", "Mínimo 2 días antes de asistir a la cita."],
+      ["Seguimiento", "Seguimiento de cómo le va en el proceso."]
+    ],
+    deliverables: [
+      "Cita BLS.",
+      "Formulario BLS completado.",
+      "Fotografías.",
+      "Reservas aéreas.",
+      "Reserva hotelera o carta de invitación.",
+      "Seguro de viaje.",
+      "Expediente organizado.",
+      "Seguimiento del trámite."
+    ],
+    observations: [
+      "La aprobación depende del oficial consular.",
+      "Los pagos consulares no son reembolsables.",
+      "La agencia no garantiza aprobación.",
+      "Tiempo de respuesta del proceso: 5 días laborables. En el caso de familiar de la Unión Europea: 2 semanas."
+    ]
+  },
   "visa-nacional-trabajo": emptyService("Visa Nacional de Trabajo"),
   "visa-nacional-estudios": emptyService("Visa Nacional de Estudios"),
   "visa-nacional-reagrupacion-comunitaria": emptyService("Visa Nacional de Reagrupación Comunitaria"),
@@ -102,7 +171,8 @@ const services = {
 
 services["visa-americana-f1"] = {
   ...JSON.parse(JSON.stringify(services["visa-americana"])),
-  title: "Visa Americana F1 (Estudios)"
+  title: "Visa Americana F1 (Estudios)",
+  version: "2026-06-04-f1-from-b1b2-doc-v2"
 };
 
 const sheet = document.querySelector("#serviceSheet");
@@ -143,6 +213,10 @@ function serviceStorageKey(key) {
 
 function serviceWordStorageKey(key) {
   return `svus-word-${key}`;
+}
+
+function serviceVersionStorageKey(key) {
+  return `svus-sheet-version-${key}`;
 }
 
 function editableText(text, tag = "span") {
@@ -715,6 +789,9 @@ function persistCurrentSheet() {
   const markup = cleanSheetMarkup();
   localStorage.setItem(serviceStorageKey(activeService), markup);
   localStorage.setItem(serviceWordStorageKey(activeService), buildWordDocumentHtml());
+  if (services[activeService]?.version) {
+    localStorage.setItem(serviceVersionStorageKey(activeService), services[activeService].version);
+  }
 }
 
 function refreshLineEditingTools() {
@@ -1026,10 +1103,12 @@ function renderSheet(key) {
   activeService = key;
   const service = services[key];
   const savedSheet = localStorage.getItem(serviceStorageKey(key));
+  const savedVersion = localStorage.getItem(serviceVersionStorageKey(key));
+  const hasCurrentVersion = !service.version || savedVersion === service.version;
   const shouldRefreshCopiedF1 = key === "visa-americana-f1"
     && savedSheet
     && !savedSheet.includes("Asesoría y gestión para la obtención");
-  const useSavedSheet = savedSheet && !shouldRefreshCopiedF1 && (service.empty || savedSheet.includes("section-card"));
+  const useSavedSheet = savedSheet && hasCurrentVersion && !shouldRefreshCopiedF1 && (service.empty || savedSheet.includes("section-card"));
   pageTitle.textContent = service.title;
 
   if (useSavedSheet) {
@@ -1063,6 +1142,34 @@ function renderSheet(key) {
   }
 
   sheet.className = "service-sheet";
+  const hasTypes = Array.isArray(service.types) && service.types.some((item) => String(item).trim());
+  const cardLayouts = hasTypes ? {
+    summary: { left: 0, top: 0, width: 33, height: 22, zIndex: 1 },
+    prices: { left: 35, top: 0, width: 29, height: 22, zIndex: 2 },
+    requirements: { left: 66, top: 0, width: 31, height: 32, zIndex: 3 },
+    types: { left: 0, top: 25, width: 33, height: 35, zIndex: 4 },
+    includes: { left: 35, top: 25, width: 29, height: 45, zIndex: 5 },
+    process: { left: 0, top: 63, width: 43, height: 34, zIndex: 6 },
+    notes: { left: 45, top: 65, width: 32, height: 31, zIndex: 7 }
+  } : {
+    summary: { left: 0, top: 0, width: 34, height: 25, zIndex: 1 },
+    prices: { left: 36, top: 0, width: 28, height: 22, zIndex: 2 },
+    requirements: { left: 66, top: 0, width: 25, height: 22, zIndex: 3 },
+    includes: { left: 0, top: 29, width: 28, height: 33, zIndex: 4 },
+    process: { left: 30, top: 25, width: 33, height: 43, zIndex: 5 },
+    notes: { left: 65, top: 25, width: 28, height: 36, zIndex: 6 }
+  };
+  const cardStyle = (name) => {
+    const layout = cardLayouts[name];
+    return `left: ${layout.left}%; top: ${layout.top}%; width: ${layout.width}%; height: ${layout.height}%; z-index: ${layout.zIndex};`;
+  };
+  const typesSection = hasTypes ? `
+      <section class="section-card types-section" style="${cardStyle("types")}">
+        ${editableText("3. Tipos de visado Schengen", "h2")}
+        ${listItems(service.types)}
+      </section>
+  ` : "";
+
   sheet.innerHTML = `
     <header class="sheet-header">
       <img src="logo-blanco-transparente.png" alt="Services Visas US">
@@ -1077,34 +1184,36 @@ function renderSheet(key) {
       <section class="sheet-page" data-page="1">
         <div class="sheet-page-label">Hoja 1</div>
         <div class="sheet-grid free-canvas">
-      <section class="section-card summary-section" style="left: 0%; top: 0%; width: 34%; height: 25%; z-index: 1;">
+      <section class="section-card summary-section" style="${cardStyle("summary")}">
         ${editableText("1. Resumen del servicio", "h2")}
         ${tableRows(service.summary, "Campo", "Información", "info-table")}
       </section>
 
-      <section class="section-card prices-section" style="left: 36%; top: 0%; width: 28%; height: 22%; z-index: 2;">
+      <section class="section-card prices-section" style="${cardStyle("prices")}">
         ${editableText("2. Precios y promociones", "h2")}
         ${tableRows(service.prices, "Concepto", "Valor", "info-table price-table")}
         ${listItems(service.promos)}
       </section>
 
-      <section class="section-card requirements-section" style="left: 66%; top: 0%; width: 25%; height: 22%; z-index: 3;">
-        ${editableText("3. Requisitos", "h2")}
+      <section class="section-card requirements-section" style="${cardStyle("requirements")}">
+        ${editableText(hasTypes ? "4. Requisitos" : "3. Requisitos", "h2")}
         ${listItems(service.requirements)}
       </section>
 
-      <section class="section-card includes-section" style="left: 0%; top: 29%; width: 28%; height: 33%; z-index: 4;">
-        ${editableText("4. ¿Qué incluye?", "h2")}
+      ${typesSection}
+
+      <section class="section-card includes-section" style="${cardStyle("includes")}">
+        ${editableText(hasTypes ? "5. ¿Qué incluye?" : "4. ¿Qué incluye?", "h2")}
         ${listItems(service.includes)}
       </section>
 
-      <section class="section-card process-section" style="left: 30%; top: 25%; width: 33%; height: 43%; z-index: 5;">
-        ${editableText("5. Proceso del servicio", "h2")}
+      <section class="section-card process-section" style="${cardStyle("process")}">
+        ${editableText(hasTypes ? "6. Proceso del servicio" : "5. Proceso del servicio", "h2")}
         ${tableRows(service.process, "Etapa", "Tiempo", "process-table")}
       </section>
 
-      <section class="section-card notes-section" style="left: 65%; top: 25%; width: 28%; height: 36%; z-index: 6;">
-        ${editableText("6. Entregables y observaciones", "h2")}
+      <section class="section-card notes-section" style="${cardStyle("notes")}">
+        ${editableText(hasTypes ? "7. Entregables y observaciones" : "6. Entregables y observaciones", "h2")}
         <div class="notes">
           <div>
             ${editableText("Entregables", "h2")}
