@@ -121,6 +121,8 @@ let draggedSection = null;
 let resizingSection = null;
 let draggedLine = null;
 let selectedLine = null;
+let selectedCard = null;
+let copiedCardMarkup = "";
 const dragReadyCards = new WeakSet();
 const undoHistory = {};
 const maxUndoSteps = 40;
@@ -171,6 +173,8 @@ function setEditMode(enabled) {
   editButton.title = editMode ? "Salir de edición" : "Editar textos";
   saveButton.disabled = !editMode;
 
+  makeCardContentEditable(sheet);
+
   sheet.querySelectorAll(".editable").forEach((element) => {
     element.contentEditable = editMode ? "true" : "false";
     element.spellcheck = true;
@@ -178,6 +182,7 @@ function setEditMode(enabled) {
 
   if (!editMode) {
     clearSelectedLine();
+    clearSelectedCard();
   }
 
   refreshLineEditingTools();
@@ -220,6 +225,7 @@ function undoLastAction() {
     return false;
   }
 
+  clearSelectedCard();
   sheet.innerHTML = history.pop();
   ensureServiceStatusButton();
   arrangeExistingSections();
@@ -232,6 +238,21 @@ function undoLastAction() {
 function clearSelectedLine() {
   selectedLine?.classList.remove("line-selected");
   selectedLine = null;
+}
+
+function clearSelectedCard() {
+  selectedCard?.classList.remove("card-selected");
+  selectedCard = null;
+}
+
+function selectCard(card) {
+  if (!card || selectedCard === card) {
+    return;
+  }
+
+  clearSelectedCard();
+  selectedCard = card;
+  selectedCard.classList.add("card-selected");
 }
 
 function selectLine(line) {
@@ -263,6 +284,116 @@ function deleteSelectedLine() {
   saveButton.disabled = false;
   persistCurrentSheet();
   refreshLineEditingTools();
+  return true;
+}
+
+function hasSelectedTextInsideCard() {
+  const selection = window.getSelection();
+
+  if (!selection || selection.isCollapsed || !selectedCard) {
+    return false;
+  }
+
+  return selectedCard.contains(selection.anchorNode) || selectedCard.contains(selection.focusNode);
+}
+
+function hasAnySelectedText() {
+  const selection = window.getSelection();
+  return Boolean(selection && !selection.isCollapsed && selection.toString().trim());
+}
+
+function makeCardContentEditable(root = sheet) {
+  root.querySelectorAll(".section-card :is(h1, h2, h3, h4, h5, h6, p, span, th, td, li, strong, em, b, i)").forEach((element) => {
+    if (element.closest("button, .resize-handle, .line-add-button")) {
+      return;
+    }
+
+    element.classList.add("editable");
+  });
+}
+
+function cleanCardForCopy(card) {
+  const clone = card.cloneNode(true);
+  stripLineEditingControls(clone);
+  clone.querySelectorAll(".resize-handle").forEach((handle) => handle.remove());
+  clone.classList.remove("card-selected", "dragging", "resizing");
+  clone.removeAttribute("data-print-style");
+  clone.querySelectorAll("[contenteditable], [spellcheck], [data-undo-snapshot]").forEach((element) => {
+    element.removeAttribute("contenteditable");
+    element.removeAttribute("spellcheck");
+    element.removeAttribute("data-undo-snapshot");
+  });
+  clone.dataset.svusCard = "true";
+  return clone;
+}
+
+function copySelectedCard(event) {
+  if (!editMode || !selectedCard?.isConnected) {
+    return;
+  }
+
+  if (hasAnySelectedText() || hasSelectedTextInsideCard()) {
+    copiedCardMarkup = "";
+    return;
+  }
+
+  const clone = cleanCardForCopy(selectedCard);
+  copiedCardMarkup = clone.outerHTML;
+
+  event.preventDefault();
+  event.clipboardData?.setData("text/html", copiedCardMarkup);
+  event.clipboardData?.setData("text/plain", clone.innerText.trim());
+}
+
+function cardFromMarkup(markup) {
+  const template = document.createElement("template");
+  template.innerHTML = markup.trim();
+  return template.content.querySelector(".section-card");
+}
+
+function pasteCopiedCard(event) {
+  if (!editMode) {
+    return false;
+  }
+
+  const clipboardHtml = event.clipboardData?.getData("text/html") || "";
+  const markup = clipboardHtml.includes("data-svus-card") ? clipboardHtml : (!event.clipboardData ? copiedCardMarkup : "");
+  const card = cardFromMarkup(markup || copiedCardMarkup);
+
+  if (!markup || !card) {
+    return false;
+  }
+
+  event.preventDefault();
+  pushUndoState();
+
+  delete card.dataset.svusCard;
+  const targetCanvas = selectedCard?.closest(".free-canvas") || sheet.querySelector(".free-canvas");
+
+  if (!targetCanvas) {
+    return false;
+  }
+
+  const sourceCard = selectedCard?.isConnected ? selectedCard : null;
+  const sourceLeft = sourceCard ? stylePercent(sourceCard, "left") : stylePercent(card, "left");
+  const sourceTop = sourceCard ? stylePercent(sourceCard, "top") : stylePercent(card, "top");
+  const width = stylePercent(card, "width", sourceCard ? stylePercent(sourceCard, "width", 24) : 24);
+  const height = stylePercent(card, "height", sourceCard ? stylePercent(sourceCard, "height", 24) : 24);
+
+  card.style.left = `${clamp(sourceLeft + 3, 0, Math.max(0, 100 - width))}%`;
+  card.style.top = `${clamp(sourceTop + 3, 0, Math.max(0, 100 - height))}%`;
+  card.style.width = `${width}%`;
+  card.style.height = `${height}%`;
+
+  makeCardContentEditable(card);
+  targetCanvas.appendChild(card);
+  bringCardToFront(card);
+  setupDraggableSections();
+  refreshLineEditingTools();
+  setEditMode(editMode);
+  selectCard(card);
+  saveButton.disabled = false;
+  persistCurrentSheet();
   return true;
 }
 
@@ -485,6 +616,8 @@ function migrateServiceMarkup(key, service) {
 
 function stripLineEditingControls(root = sheet) {
   root.querySelectorAll(".line-add-button").forEach((button) => button.remove());
+  root.querySelectorAll(".card-selected").forEach((card) => card.classList.remove("card-selected"));
+  root.querySelectorAll("[data-svus-card]").forEach((card) => card.removeAttribute("data-svus-card"));
   root.querySelectorAll(".line-editable").forEach((element) => {
     element.classList.remove("line-editable", "line-dragging", "line-drop-before", "line-drop-after", "line-selected");
     element.removeAttribute("draggable");
@@ -852,6 +985,8 @@ function setupDraggableSections() {
 }
 
 function renderSheet(key) {
+  clearSelectedLine();
+  clearSelectedCard();
   activeService = key;
   const service = services[key];
   const savedSheet = localStorage.getItem(serviceStorageKey(key));
@@ -974,6 +1109,11 @@ sheet.addEventListener("focusin", (event) => {
     return;
   }
 
+  const card = event.target.closest(".section-card");
+  if (editMode && card) {
+    selectCard(card);
+  }
+
   event.target.dataset.undoSnapshot = currentSnapshot();
 });
 
@@ -1009,6 +1149,13 @@ sheet.addEventListener("focusout", (event) => {
 sheet.addEventListener("pointerdown", (event) => {
   if (!editMode) {
     return;
+  }
+
+  const card = event.target.closest(".section-card");
+  if (card) {
+    selectCard(card);
+  } else {
+    clearSelectedCard();
   }
 
   const line = event.target.closest(".line-editable");
@@ -1188,6 +1335,12 @@ sheet.addEventListener("click", (event) => {
   statusButton.setAttribute("aria-label", nextInactive ? "Marcar servicio como activo" : "Marcar servicio como inactivo");
   statusButton.title = nextInactive ? "Cambiar a servicio activo" : "Cambiar a servicio inactivo";
   persistCurrentSheet();
+});
+
+document.addEventListener("copy", copySelectedCard);
+
+document.addEventListener("paste", (event) => {
+  pasteCopiedCard(event);
 });
 
 document.addEventListener("keydown", (event) => {
