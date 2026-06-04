@@ -665,6 +665,16 @@ body.editing .line-dragging {
   opacity: 0.45;
 }
 
+body.editing .list .line-selected {
+  background: rgba(255, 240, 199, 0.88);
+  box-shadow: inset 0 0 0 2px rgba(240, 199, 83, 0.86);
+}
+
+body.editing tr.line-selected td {
+  background: rgba(255, 240, 199, 0.88);
+  box-shadow: inset 0 0 0 1px rgba(240, 199, 83, 0.86);
+}
+
 body.editing .line-drop-before {
   box-shadow: inset 0 2px 0 var(--blue-light);
 }

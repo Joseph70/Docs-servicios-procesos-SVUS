@@ -115,6 +115,7 @@ let editMode = false;
 let draggedSection = null;
 let resizingSection = null;
 let draggedLine = null;
+let selectedLine = null;
 const dragReadyCards = new WeakSet();
 const undoHistory = {};
 const maxUndoSteps = 40;
@@ -169,6 +170,11 @@ function setEditMode(enabled) {
     element.contentEditable = editMode ? "true" : "false";
     element.spellcheck = true;
   });
+
+  if (!editMode) {
+    clearSelectedLine();
+  }
+
   refreshLineEditingTools();
   setupDraggableSections();
 }
@@ -215,6 +221,43 @@ function undoLastAction() {
   setEditMode(editMode);
   setupDraggableSections();
   persistCurrentSheet();
+  return true;
+}
+
+function clearSelectedLine() {
+  selectedLine?.classList.remove("line-selected");
+  selectedLine = null;
+}
+
+function selectLine(line) {
+  clearSelectedLine();
+  selectedLine = line;
+  selectedLine.classList.add("line-selected");
+}
+
+function isLineHandleClick(line, event) {
+  const handleHost = line.matches("tr") ? line.cells[0] : line;
+  if (!handleHost) {
+    return false;
+  }
+
+  const rect = handleHost.getBoundingClientRect();
+  return event.clientX >= rect.left && event.clientX <= rect.left + 26;
+}
+
+function deleteSelectedLine() {
+  if (!selectedLine?.isConnected || !editMode) {
+    clearSelectedLine();
+    return false;
+  }
+
+  pushUndoState();
+  const lineToDelete = selectedLine;
+  clearSelectedLine();
+  lineToDelete.remove();
+  saveButton.disabled = false;
+  persistCurrentSheet();
+  refreshLineEditingTools();
   return true;
 }
 
@@ -377,7 +420,7 @@ function migrateServiceMarkup(key, service) {
 function stripLineEditingControls(root = sheet) {
   root.querySelectorAll(".line-add-button").forEach((button) => button.remove());
   root.querySelectorAll(".line-editable").forEach((element) => {
-    element.classList.remove("line-editable", "line-dragging", "line-drop-before", "line-drop-after");
+    element.classList.remove("line-editable", "line-dragging", "line-drop-before", "line-drop-after", "line-selected");
     element.removeAttribute("draggable");
     element.removeAttribute("title");
   });
@@ -483,7 +526,7 @@ function refreshLineEditingTools() {
     list.querySelectorAll(":scope > li.editable").forEach((item) => {
       item.classList.add("line-editable");
       item.draggable = true;
-      item.title = "Arrastra para cambiar la posicion";
+      item.title = "Arrastra para cambiar la posicion. Selecciona el marcador inicial y presiona Suprimir para eliminar.";
     });
 
     const addButton = document.createElement("button");
@@ -499,7 +542,7 @@ function refreshLineEditingTools() {
     table.querySelectorAll("tbody > tr").forEach((row) => {
       row.classList.add("line-editable");
       row.draggable = true;
-      row.title = "Arrastra para cambiar la posicion";
+      row.title = "Arrastra para cambiar la posicion. Selecciona el marcador inicial y presiona Suprimir para eliminar.";
     });
 
     const addButton = document.createElement("button");
@@ -893,6 +936,33 @@ sheet.addEventListener("focusout", (event) => {
   }
 });
 
+sheet.addEventListener("pointerdown", (event) => {
+  if (!editMode) {
+    return;
+  }
+
+  const line = event.target.closest(".line-editable");
+  if (!line) {
+    if (!event.target.closest(".line-add-button")) {
+      clearSelectedLine();
+    }
+    return;
+  }
+
+  if (!isLineHandleClick(line, event)) {
+    clearSelectedLine();
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  selectLine(line);
+
+  if (document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur();
+  }
+});
+
 sheet.addEventListener("click", (event) => {
   const addPageButton = event.target.closest(".add-page-button");
   if (!addPageButton) {
@@ -932,7 +1002,7 @@ sheet.addEventListener("click", (event) => {
     item.contentEditable = "true";
     item.spellcheck = true;
     item.draggable = true;
-    item.title = "Arrastra para cambiar la posicion";
+    item.title = "Arrastra para cambiar la posicion. Selecciona el marcador inicial y presiona Suprimir para eliminar.";
     list.appendChild(item);
     focusEditable(item);
   }
@@ -950,7 +1020,7 @@ sheet.addEventListener("click", (event) => {
     const row = document.createElement("tr");
     row.className = "line-editable";
     row.draggable = true;
-    row.title = "Arrastra para cambiar la posicion";
+    row.title = "Arrastra para cambiar la posicion. Selecciona el marcador inicial y presiona Suprimir para eliminar.";
 
     Array.from({ length: columnCount }).forEach((_, index) => {
       const cell = document.createElement("td");
@@ -1051,6 +1121,13 @@ sheet.addEventListener("click", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
+  if (editMode && (event.key === "Delete" || event.code === "Delete") && selectedLine) {
+    if (deleteSelectedLine()) {
+      event.preventDefault();
+    }
+    return;
+  }
+
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && !event.shiftKey) {
     if (undoLastAction()) {
       event.preventDefault();
