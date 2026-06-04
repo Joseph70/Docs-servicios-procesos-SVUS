@@ -58,7 +58,7 @@ echo.
 echo Guardando archivos actuales...
 "C:\Program Files\Git\cmd\git.exe" --git-dir="%GIT_DIR%" --work-tree="." config user.name "Joseph"
 "C:\Program Files\Git\cmd\git.exe" --git-dir="%GIT_DIR%" --work-tree="." config user.email "joseph@users.noreply.github.com"
-"C:\Program Files\Git\cmd\git.exe" --git-dir="%GIT_DIR%" --work-tree="." add -- "Fichas de servicio.html" "styles.css" "script.js" "LOGO BLANCO.png" "logo-blanco-transparente.png" "logo-impresion-color.png" "svus-logo.png" "SERVICIO VISA AMERICA B1-B2.docx" "publish-github.cmd"
+"C:\Program Files\Git\cmd\git.exe" --git-dir="%GIT_DIR%" --work-tree="." add -- "index.html" "Fichas de servicio.html" "styles.css" "script.js" "LOGO BLANCO.png" "logo-blanco-transparente.png" "logo-impresion-color.png" "svus-logo.png" "SERVICIO VISA AMERICA B1-B2.docx" "publish-github.cmd"
 "C:\Program Files\Git\cmd\git.exe" --git-dir="%GIT_DIR%" --work-tree="." diff --cached --quiet
 if errorlevel 1 (
   "C:\Program Files\Git\cmd\git.exe" --git-dir="%GIT_DIR%" --work-tree="." commit -m "Update service docs manual"
