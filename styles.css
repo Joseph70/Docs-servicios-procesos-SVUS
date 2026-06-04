@@ -654,11 +654,11 @@ body.editing .resize-handle {
 }
 
 body.editing .line-editable {
-  cursor: grab;
+  cursor: text;
 }
 
 body.editing .line-editable:active {
-  cursor: grabbing;
+  cursor: text;
 }
 
 body.editing .line-dragging {
@@ -697,6 +697,7 @@ body.editing .list .line-editable::after {
   left: 6px;
   top: 50%;
   color: var(--blue-mid);
+  cursor: default;
   font-size: 0.68rem;
   font-weight: 900;
   transform: translateY(-50%);
@@ -713,6 +714,7 @@ body.editing .line-editable td:first-child::before {
   left: 5px;
   top: 3px;
   color: var(--blue-mid);
+  cursor: default;
   font-size: 0.66rem;
   font-weight: 900;
 }
@@ -754,6 +756,7 @@ body.moving-card * {
   border-radius: 5px;
   outline: 1px dashed rgba(49, 86, 138, 0.6);
   background: rgba(255, 240, 199, 0.42);
+  cursor: text;
 }
 
 .editable[contenteditable="true"]:focus {
