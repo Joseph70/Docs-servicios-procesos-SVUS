@@ -58,7 +58,7 @@ echo.
 echo Guardando archivos actuales...
 "C:\Program Files\Git\cmd\git.exe" --git-dir="%GIT_DIR%" --work-tree="." config user.name "Joseph"
 "C:\Program Files\Git\cmd\git.exe" --git-dir="%GIT_DIR%" --work-tree="." config user.email "joseph@users.noreply.github.com"
-"C:\Program Files\Git\cmd\git.exe" --git-dir="%GIT_DIR%" --work-tree="." add -- "index.html" "Fichas de servicio.html" "styles.css" "script.js" "LOGO BLANCO.png" "logo-blanco-transparente.png" "logo-impresion-color.png" "svus-logo.png" "SERVICIO VISA AMERICA B1-B2.docx" "publish-github.cmd"
+"C:\Program Files\Git\cmd\git.exe" --git-dir="%GIT_DIR%" --work-tree="." add -- "index.html" "Fichas de servicio.html" "styles.css" "script.js" "vercel.json" "LOGO BLANCO.png" "logo-blanco-transparente.png" "logo-impresion-color.png" "svus-logo.png" "SERVICIO VISA AMERICA B1-B2.docx" "publish-github.cmd"
 "C:\Program Files\Git\cmd\git.exe" --git-dir="%GIT_DIR%" --work-tree="." diff --cached --quiet
 if errorlevel 1 (
   "C:\Program Files\Git\cmd\git.exe" --git-dir="%GIT_DIR%" --work-tree="." commit -m "Update service docs manual"
@@ -72,6 +72,16 @@ echo Subiendo a GitHub...
 if errorlevel 1 (
   echo.
   echo No se pudo subir. Revisa tu conexion o vuelve a ejecutar este archivo despues de iniciar sesion.
+  pause
+  exit /b 1
+)
+
+echo.
+echo Subiendo tambien a la rama principal para Vercel...
+"C:\Program Files\Git\cmd\git.exe" --git-dir="%GIT_DIR%" --work-tree="." push origin HEAD:principal
+if errorlevel 1 (
+  echo.
+  echo No se pudo subir a la rama principal. Revisa si Vercel esta conectado a main o principal.
   pause
   exit /b 1
 )
