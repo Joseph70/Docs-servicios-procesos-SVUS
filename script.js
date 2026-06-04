@@ -315,7 +315,7 @@ function makeCardContentEditable(root = sheet) {
 function cleanCardForCopy(card) {
   const clone = card.cloneNode(true);
   stripLineEditingControls(clone);
-  clone.querySelectorAll(".resize-handle").forEach((handle) => handle.remove());
+  clone.querySelectorAll(".card-move-handle, .resize-handle").forEach((handle) => handle.remove());
   clone.classList.remove("card-selected", "dragging", "resizing");
   clone.removeAttribute("data-print-style");
   clone.querySelectorAll("[contenteditable], [spellcheck], [data-undo-snapshot]").forEach((element) => {
@@ -616,6 +616,9 @@ function migrateServiceMarkup(key, service) {
 
 function stripLineEditingControls(root = sheet) {
   root.querySelectorAll(".line-add-button").forEach((button) => button.remove());
+  if (root !== sheet) {
+    root.querySelectorAll(".card-move-handle").forEach((button) => button.remove());
+  }
   root.querySelectorAll(".card-selected").forEach((card) => card.classList.remove("card-selected"));
   root.querySelectorAll("[data-svus-card]").forEach((card) => card.removeAttribute("data-svus-card"));
   root.querySelectorAll(".line-editable").forEach((element) => {
@@ -845,9 +848,79 @@ function bringCardToFront(card) {
   card.style.zIndex = String(maxZ + 1);
 }
 
+function startCardMove(event, card, pointerTarget = card) {
+  let canvas = card.closest(".free-canvas");
+  if (!canvas) {
+    return;
+  }
+
+  event.preventDefault();
+  pushUndoState();
+  draggedSection = card;
+  selectCard(card);
+  bringCardToFront(card);
+  card.classList.add("dragging");
+  document.body.classList.add("moving-card");
+
+  const cardRect = card.getBoundingClientRect();
+  const pointerOffsetX = event.clientX - cardRect.left;
+  const pointerOffsetY = event.clientY - cardRect.top;
+  pointerTarget.setPointerCapture(event.pointerId);
+
+  const onPointerMove = (moveEvent) => {
+    const targetCanvas = document.elementsFromPoint(moveEvent.clientX, moveEvent.clientY)
+      .find((element) => element.classList?.contains("free-canvas"));
+
+    if (targetCanvas && targetCanvas !== canvas) {
+      canvas = targetCanvas;
+      canvas.appendChild(card);
+    }
+
+    const canvasRect = canvas.getBoundingClientRect();
+    const widthPercent = card.getBoundingClientRect().width / canvasRect.width * 100;
+    const heightPercent = card.getBoundingClientRect().height / canvasRect.height * 100;
+    const nextLeft = (moveEvent.clientX - canvasRect.left - pointerOffsetX) / canvasRect.width * 100;
+    const nextTop = (moveEvent.clientY - canvasRect.top - pointerOffsetY) / canvasRect.height * 100;
+    card.style.left = `${clamp(nextLeft, 0, Math.max(0, 100 - widthPercent))}%`;
+    card.style.top = `${clamp(nextTop, 0, Math.max(0, 100 - heightPercent))}%`;
+  };
+
+  const onPointerUp = () => {
+    pointerTarget.removeEventListener("pointermove", onPointerMove);
+    pointerTarget.removeEventListener("pointerup", onPointerUp);
+    pointerTarget.removeEventListener("pointercancel", onPointerUp);
+    card.classList.remove("dragging");
+    document.body.classList.remove("moving-card");
+    draggedSection = null;
+    if (pointerTarget.hasPointerCapture(event.pointerId)) {
+      pointerTarget.releasePointerCapture(event.pointerId);
+    }
+    if (editMode) {
+      saveButton.disabled = false;
+      persistCurrentSheet();
+    } else {
+      saveSheetLayout();
+    }
+  };
+
+  pointerTarget.addEventListener("pointermove", onPointerMove);
+  pointerTarget.addEventListener("pointerup", onPointerUp);
+  pointerTarget.addEventListener("pointercancel", onPointerUp);
+}
+
 function setupDraggableSections() {
   sheet.querySelectorAll(".section-card").forEach((card) => {
     card.draggable = false;
+
+    let moveHandle = card.querySelector(":scope > .card-move-handle");
+    if (!moveHandle) {
+      moveHandle = document.createElement("button");
+      moveHandle.className = "card-move-handle";
+      moveHandle.type = "button";
+      moveHandle.setAttribute("aria-label", "Mover recuadro");
+      moveHandle.title = "Arrastra para mover el recuadro";
+      card.appendChild(moveHandle);
+    }
 
     let resizeHandle = card.querySelector(":scope > .resize-handle");
     if (!resizeHandle) {
@@ -865,57 +938,20 @@ function setupDraggableSections() {
 
     dragReadyCards.add(card);
     card.addEventListener("pointerdown", (event) => {
-      if (editMode || resizingSection || event.button !== 0 || event.target.closest(".resize-handle")) {
+      if (editMode || resizingSection || event.button !== 0 || event.target.closest(".resize-handle, .card-move-handle")) {
         return;
       }
 
-      event.preventDefault();
-      pushUndoState();
-      draggedSection = card;
-      bringCardToFront(card);
-      card.classList.add("dragging");
-      document.body.classList.add("moving-card");
+      startCardMove(event, card);
+    });
 
-      let canvas = card.closest(".free-canvas");
-      const cardRect = card.getBoundingClientRect();
-      const pointerOffsetX = event.clientX - cardRect.left;
-      const pointerOffsetY = event.clientY - cardRect.top;
-      card.setPointerCapture(event.pointerId);
+    moveHandle.addEventListener("pointerdown", (event) => {
+      if (!editMode || resizingSection || event.button !== 0) {
+        return;
+      }
 
-      const onPointerMove = (moveEvent) => {
-        const targetCanvas = document.elementsFromPoint(moveEvent.clientX, moveEvent.clientY)
-          .find((element) => element.classList?.contains("free-canvas"));
-
-        if (targetCanvas && targetCanvas !== canvas) {
-          canvas = targetCanvas;
-          canvas.appendChild(card);
-        }
-
-        const canvasRect = canvas.getBoundingClientRect();
-        const widthPercent = card.getBoundingClientRect().width / canvasRect.width * 100;
-        const heightPercent = card.getBoundingClientRect().height / canvasRect.height * 100;
-        const nextLeft = (moveEvent.clientX - canvasRect.left - pointerOffsetX) / canvasRect.width * 100;
-        const nextTop = (moveEvent.clientY - canvasRect.top - pointerOffsetY) / canvasRect.height * 100;
-        card.style.left = `${clamp(nextLeft, 0, Math.max(0, 100 - widthPercent))}%`;
-        card.style.top = `${clamp(nextTop, 0, Math.max(0, 100 - heightPercent))}%`;
-      };
-
-      const onPointerUp = () => {
-        card.removeEventListener("pointermove", onPointerMove);
-        card.removeEventListener("pointerup", onPointerUp);
-        card.removeEventListener("pointercancel", onPointerUp);
-        card.classList.remove("dragging");
-        document.body.classList.remove("moving-card");
-        draggedSection = null;
-        if (card.hasPointerCapture(event.pointerId)) {
-          card.releasePointerCapture(event.pointerId);
-        }
-        saveSheetLayout();
-      };
-
-      card.addEventListener("pointermove", onPointerMove);
-      card.addEventListener("pointerup", onPointerUp);
-      card.addEventListener("pointercancel", onPointerUp);
+      event.stopPropagation();
+      startCardMove(event, card, moveHandle);
     });
 
     resizeHandle.addEventListener("pointerdown", (event) => {

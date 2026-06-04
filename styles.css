@@ -445,6 +445,30 @@ button {
   user-select: none;
 }
 
+.card-move-handle {
+  position: absolute;
+  right: 27px;
+  bottom: 5px;
+  display: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid rgba(49, 86, 138, 0.3);
+  border-radius: 6px;
+  background:
+    radial-gradient(circle, var(--blue-mid) 1.3px, transparent 1.5px) 3px 3px / 6px 6px,
+    linear-gradient(135deg, #fff8df, var(--gold));
+  box-shadow: 0 5px 12px rgba(184, 134, 15, 0.16);
+  cursor: move;
+  opacity: 0.84;
+  z-index: 5;
+}
+
+.card-move-handle:hover {
+  opacity: 1;
+  box-shadow: 0 0 14px rgba(240, 199, 83, 0.58);
+}
+
 .resize-handle {
   position: absolute;
   right: 5px;
@@ -664,6 +688,15 @@ body.editing .section-card:hover {
 body.editing .resize-handle {
   opacity: 0.28;
   cursor: default !important;
+}
+
+body.editing .card-move-handle {
+  display: inline-flex;
+}
+
+body.editing .card-move-handle,
+body.editing .card-move-handle * {
+  cursor: move !important;
 }
 
 body.editing .line-editable {
@@ -1102,6 +1135,7 @@ body.dark .icon-sun {
     border-radius: inherit;
   }
 
+  .card-move-handle,
   .resize-handle {
     display: none;
   }
