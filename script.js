@@ -452,6 +452,34 @@ function nearestSnap(start, size, targets, threshold) {
   return nearest;
 }
 
+function nearestSizeSnap(start, size, targets, threshold, minSize, maxSize) {
+  let nearest = null;
+  const points = [
+    { value: start + size / 2, sizeForTarget: (target) => (target - start) * 2 },
+    { value: start + size, sizeForTarget: (target) => target - start }
+  ];
+
+  points.forEach((point) => {
+    targets.forEach((target) => {
+      const nextSize = point.sizeForTarget(target);
+      if (nextSize < minSize || nextSize > maxSize) {
+        return;
+      }
+
+      const distance = Math.abs(point.value - target);
+      if (distance <= threshold && (!nearest || distance < nearest.distance)) {
+        nearest = {
+          guide: target,
+          size: nextSize,
+          distance
+        };
+      }
+    });
+  });
+
+  return nearest;
+}
+
 function snapCardToGuides(left, top, width, height, card, canvas, canvasRect) {
   const { xTargets, yTargets } = collectAlignmentTargets(card, canvas, canvasRect);
   const xThreshold = Math.max(0.75, 12 / canvasRect.width * 100);
@@ -462,6 +490,23 @@ function snapCardToGuides(left, top, width, height, card, canvas, canvasRect) {
   return {
     left: xSnap ? xSnap.start : left,
     top: ySnap ? ySnap.start : top
+  };
+}
+
+function snapCardSizeToGuides(width, height, left, top, card, canvas, canvasRect) {
+  const minWidth = 12;
+  const minHeight = 12;
+  const maxWidth = Math.max(minWidth, 100 - left);
+  const maxHeight = Math.max(minHeight, 100 - top);
+  const { xTargets, yTargets } = collectAlignmentTargets(card, canvas, canvasRect);
+  const xThreshold = Math.max(0.75, 12 / canvasRect.width * 100);
+  const yThreshold = Math.max(0.75, 12 / canvasRect.height * 100);
+  const xSnap = nearestSizeSnap(left, width, xTargets, xThreshold, minWidth, maxWidth);
+  const ySnap = nearestSizeSnap(top, height, yTargets, yThreshold, minHeight, maxHeight);
+
+  return {
+    width: xSnap ? xSnap.size : width,
+    height: ySnap ? ySnap.size : height
   };
 }
 
@@ -1259,8 +1304,20 @@ function setupDraggableSections() {
         const top = Number.parseFloat(card.style.top) || 0;
         const nextWidth = startWidth + (moveEvent.clientX - startX) / currentCanvasRect.width * 100;
         const nextHeight = startHeight + (moveEvent.clientY - startY) / currentCanvasRect.height * 100;
-        card.style.width = `${clamp(nextWidth, 12, Math.max(12, 100 - left))}%`;
-        card.style.height = `${clamp(nextHeight, 12, Math.max(12, 100 - top))}%`;
+        const maxWidth = Math.max(12, 100 - left);
+        const maxHeight = Math.max(12, 100 - top);
+        const snapped = snapCardSizeToGuides(
+          clamp(nextWidth, 12, maxWidth),
+          clamp(nextHeight, 12, maxHeight),
+          left,
+          top,
+          card,
+          canvas,
+          currentCanvasRect
+        );
+
+        card.style.width = `${clamp(snapped.width, 12, maxWidth)}%`;
+        card.style.height = `${clamp(snapped.height, 12, maxHeight)}%`;
         updateAlignmentGuides(card, canvas);
       };
 
