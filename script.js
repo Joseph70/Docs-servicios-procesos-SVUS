@@ -183,7 +183,8 @@ const saveButton = document.querySelector("#saveButton");
 const themeToggle = document.querySelector("#themeToggle");
 const printButton = document.querySelector("#printButton");
 const wordButton = document.querySelector("#wordButton");
-const screenLogoSrc = "logo-blanco-transparente.png";
+const lightLogoSrc = "svus-logo.png";
+const darkLogoSrc = "logo-blanco-transparente.png";
 const printLogoSrc = "logo-impresion-color.png";
 let activeService = "visa-americana";
 let editMode = false;
@@ -206,6 +207,21 @@ const defaultLayouts = [
   { className: "process-section", left: 30, top: 25, width: 33, height: 43 },
   { className: "notes-section", left: 65, top: 25, width: 28, height: 36 }
 ];
+
+function currentScreenLogoSrc() {
+  return document.body.classList.contains("dark") ? darkLogoSrc : lightLogoSrc;
+}
+
+function updateThemeLogos(root = document) {
+  if (document.body.classList.contains("printing-fit")) {
+    return;
+  }
+
+  root.querySelectorAll(".theme-logo, .brand img, .sheet-header img").forEach((image) => {
+    image.classList.add("theme-logo");
+    image.setAttribute("src", currentScreenLogoSrc());
+  });
+}
 
 function serviceStorageKey(key) {
   return `svus-sheet-${key}`;
@@ -645,15 +661,17 @@ function normalizeCanvasLayout(canvas) {
 
 function setSheetLogoForPrint() {
   sheet.querySelectorAll(".sheet-header img").forEach((image) => {
-    image.dataset.screenSrc = image.getAttribute("src") || screenLogoSrc;
+    image.dataset.screenSrc = image.getAttribute("src") || currentScreenLogoSrc();
     image.setAttribute("src", printLogoSrc);
   });
 }
 
 function restoreSheetLogoAfterPrint() {
   sheet.querySelectorAll(".sheet-header img").forEach((image) => {
-    image.setAttribute("src", image.dataset.screenSrc || screenLogoSrc);
+    image.setAttribute("src", currentScreenLogoSrc());
+    delete image.dataset.screenSrc;
   });
+  updateThemeLogos(sheet);
 }
 
 function stylePercent(element, property, fallback = 0) {
@@ -1233,6 +1251,7 @@ function renderSheet(key) {
     stripLineEditingControls();
     ensureServiceStatusButton();
     migrateServiceMarkup(key, service);
+    updateThemeLogos(sheet);
     arrangeExistingSections();
     setEditMode(editMode);
     setupDraggableSections();
@@ -1244,7 +1263,7 @@ function renderSheet(key) {
     sheet.className = "service-sheet empty-sheet";
     sheet.innerHTML = `
       <header class="sheet-header">
-        <img src="logo-blanco-transparente.png" alt="Services Visas US">
+        <img class="theme-logo" src="${currentScreenLogoSrc()}" alt="Services Visas US">
         <div>
           <p class="sheet-kicker editable">Ficha de servicio</p>
           <h2 class="sheet-title editable">${service.title}</h2>
@@ -1253,6 +1272,7 @@ function renderSheet(key) {
       <div></div>
     `;
     ensureSheetPages();
+    updateThemeLogos(sheet);
     setEditMode(editMode);
     return;
   }
@@ -1288,7 +1308,7 @@ function renderSheet(key) {
 
   sheet.innerHTML = `
     <header class="sheet-header">
-      <img src="logo-blanco-transparente.png" alt="Services Visas US">
+      <img class="theme-logo" src="${currentScreenLogoSrc()}" alt="Services Visas US">
       <div>
         <p class="sheet-kicker editable">Ficha de servicio</p>
         <h2 class="sheet-title editable">${service.title}</h2>
@@ -1348,6 +1368,7 @@ function renderSheet(key) {
   `;
   ensureServiceStatusButton();
   ensureSheetPages();
+  updateThemeLogos(sheet);
   setEditMode(editMode);
   setupDraggableSections();
   normalizeCanvasLayout(sheet.querySelector(".free-canvas"));
@@ -1649,6 +1670,7 @@ themeToggle.addEventListener("click", () => {
   const isDark = document.body.classList.toggle("dark");
   themeToggle.setAttribute("aria-label", isDark ? "Activar modo claro" : "Activar modo oscuro");
   localStorage.setItem("svus-theme", isDark ? "dark" : "light");
+  updateThemeLogos();
 });
 
 printButton.addEventListener("click", () => {
@@ -1678,4 +1700,5 @@ if (localStorage.getItem("svus-theme") === "dark") {
   themeToggle.setAttribute("aria-label", "Activar modo claro");
 }
 
+updateThemeLogos();
 renderSheet("visa-americana");
