@@ -1564,6 +1564,9 @@ sheet.addEventListener("dblclick", (event) => {
     if (event.target.closest(".sheet-grid, .sheet-page, .service-sheet")) {
       event.preventDefault();
       event.stopPropagation();
+      if (editMode) {
+        saveCurrentSheet();
+      }
     }
 
     return;
