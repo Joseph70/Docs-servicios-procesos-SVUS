@@ -406,21 +406,7 @@ function nearestGuide(points, targets, threshold = 1.15) {
   return nearest;
 }
 
-function updateAlignmentGuides(card, canvas) {
-  if (!canvas || !card?.isConnected) {
-    hideAlignmentGuides();
-    return;
-  }
-
-  const { vertical, horizontal } = ensureAlignmentGuides(canvas);
-  const canvasRect = canvas.getBoundingClientRect();
-  const cardRect = card.getBoundingClientRect();
-  const left = stylePercent(card, "left");
-  const top = stylePercent(card, "top");
-  const width = cardRect.width / canvasRect.width * 100;
-  const height = cardRect.height / canvasRect.height * 100;
-  const xPoints = [left, left + width / 2, left + width];
-  const yPoints = [top, top + height / 2, top + height];
+function collectAlignmentTargets(card, canvas, canvasRect) {
   const xTargets = [0, 50, 100];
   const yTargets = [0, 50, 100];
 
@@ -438,6 +424,63 @@ function updateAlignmentGuides(card, canvas) {
     xTargets.push(otherLeft, otherLeft + otherWidth / 2, otherLeft + otherWidth);
     yTargets.push(otherTop, otherTop + otherHeight / 2, otherTop + otherHeight);
   });
+
+  return { xTargets, yTargets };
+}
+
+function nearestSnap(start, size, targets, threshold) {
+  let nearest = null;
+  const points = [
+    { value: start, offset: 0 },
+    { value: start + size / 2, offset: size / 2 },
+    { value: start + size, offset: size }
+  ];
+
+  points.forEach((point) => {
+    targets.forEach((target) => {
+      const distance = Math.abs(point.value - target);
+      if (distance <= threshold && (!nearest || distance < nearest.distance)) {
+        nearest = {
+          guide: target,
+          start: target - point.offset,
+          distance
+        };
+      }
+    });
+  });
+
+  return nearest;
+}
+
+function snapCardToGuides(left, top, width, height, card, canvas, canvasRect) {
+  const { xTargets, yTargets } = collectAlignmentTargets(card, canvas, canvasRect);
+  const xThreshold = Math.max(0.75, 12 / canvasRect.width * 100);
+  const yThreshold = Math.max(0.75, 12 / canvasRect.height * 100);
+  const xSnap = nearestSnap(left, width, xTargets, xThreshold);
+  const ySnap = nearestSnap(top, height, yTargets, yThreshold);
+
+  return {
+    left: xSnap ? xSnap.start : left,
+    top: ySnap ? ySnap.start : top
+  };
+}
+
+function updateAlignmentGuides(card, canvas) {
+  if (!canvas || !card?.isConnected) {
+    hideAlignmentGuides();
+    return;
+  }
+
+  const { vertical, horizontal } = ensureAlignmentGuides(canvas);
+  const canvasRect = canvas.getBoundingClientRect();
+  const cardRect = card.getBoundingClientRect();
+  const left = stylePercent(card, "left");
+  const top = stylePercent(card, "top");
+  const width = cardRect.width / canvasRect.width * 100;
+  const height = cardRect.height / canvasRect.height * 100;
+  const xPoints = [left, left + width / 2, left + width];
+  const yPoints = [top, top + height / 2, top + height];
+  const { xTargets, yTargets } = collectAlignmentTargets(card, canvas, canvasRect);
 
   const xGuide = nearestGuide(xPoints, xTargets);
   const yGuide = nearestGuide(yPoints, yTargets);
@@ -1118,8 +1161,20 @@ function startCardMove(event, card, pointerTarget = card, options = {}) {
     const nextTop = options.relative
       ? startTop + (moveEvent.clientY - startPointerY) / canvasRect.height * 100
       : (moveEvent.clientY - canvasRect.top - pointerOffsetY) / canvasRect.height * 100;
-    card.style.left = `${clamp(nextLeft, 0, Math.max(0, 100 - widthPercent))}%`;
-    card.style.top = `${clamp(nextTop, 0, Math.max(0, 100 - heightPercent))}%`;
+    const maxLeft = Math.max(0, 100 - widthPercent);
+    const maxTop = Math.max(0, 100 - heightPercent);
+    const snapped = snapCardToGuides(
+      clamp(nextLeft, 0, maxLeft),
+      clamp(nextTop, 0, maxTop),
+      widthPercent,
+      heightPercent,
+      card,
+      canvas,
+      canvasRect
+    );
+
+    card.style.left = `${clamp(snapped.left, 0, maxLeft)}%`;
+    card.style.top = `${clamp(snapped.top, 0, maxTop)}%`;
     updateAlignmentGuides(card, canvas);
   };
 
