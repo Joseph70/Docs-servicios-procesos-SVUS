@@ -461,7 +461,7 @@ button {
   min-height: 0;
   min-width: 120px;
   box-shadow: 0 8px 18px rgba(15, 63, 105, 0.06);
-  cursor: default;
+  cursor: grab;
   overflow: auto;
   scrollbar-width: thin;
   touch-action: none;
@@ -477,6 +477,10 @@ button {
   opacity: 0.55;
   cursor: grabbing;
   transform: scale(0.985);
+}
+
+.section-card :is(.editable, .editable *, .line-editable, .line-editable *, table, thead, tbody, tr, td, th, ul, ol, li, p, h1, h2, h3, h4, h5, h6, span, strong, em, b, i) {
+  cursor: text;
 }
 
 .section-card.resizing {

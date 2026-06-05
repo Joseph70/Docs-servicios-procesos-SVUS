@@ -556,10 +556,6 @@ function isCardMoveSurface(target, card) {
     return false;
   }
 
-  if (!editMode) {
-    return false;
-  }
-
   if (target.closest("button, input, textarea, select, .resize-handle, .line-add-button")) {
     return false;
   }
