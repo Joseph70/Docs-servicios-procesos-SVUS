@@ -31,6 +31,25 @@ function emptyService(title) {
   };
 }
 
+function nationalVisaService(title) {
+  return {
+    ...emptyService(title),
+    version: "2026-06-05-national-schengen-format-v1",
+    layout: "schengen",
+    titleOnly: true,
+    typesTitle: "3. Tipos de visado nacional",
+    summary: [],
+    prices: [],
+    promos: [],
+    requirements: [],
+    types: [],
+    includes: [],
+    process: [],
+    deliverables: [],
+    observations: []
+  };
+}
+
 const services = {
   "visa-americana": {
     title: "Visa Americana B1/B2 (Negocios y Turismo)",
@@ -160,10 +179,10 @@ const services = {
       "Tiempo de respuesta del proceso: 5 días laborables. En el caso de familiar de la Unión Europea: 2 semanas."
     ]
   },
-  "visa-nacional-trabajo": emptyService("Visa Nacional de Trabajo"),
-  "visa-nacional-estudios": emptyService("Visa Nacional de Estudios"),
-  "visa-nacional-reagrupacion-comunitaria": emptyService("Visa Nacional de Reagrupación Comunitaria"),
-  "visa-nacional-recuperacion-residencia": emptyService("Visa Nacional Recuperación de Tarjeta de Residencia"),
+  "visa-nacional-trabajo": nationalVisaService("Visa Nacional de Trabajo"),
+  "visa-nacional-estudios": nationalVisaService("Visa Nacional de Estudios"),
+  "visa-nacional-reagrupacion-comunitaria": nationalVisaService("Visa Nacional de Reagrupación Comunitaria"),
+  "visa-nacional-recuperacion-residencia": nationalVisaService("Visa Nacional Recuperación de Tarjeta de Residencia"),
   vuelos: emptyService("Vuelos"),
   tours: emptyService("Tours"),
   seguros: emptyService("Seguros")
@@ -1278,8 +1297,11 @@ function renderSheet(key) {
   }
 
   sheet.className = "service-sheet";
-  const hasTypes = Array.isArray(service.types) && service.types.some((item) => String(item).trim());
-  const cardLayouts = hasTypes ? {
+  const titleOnly = Boolean(service.titleOnly);
+  const hasTypesContent = Array.isArray(service.types) && service.types.some((item) => String(item).trim());
+  const usesSchengenLayout = service.layout === "schengen" || hasTypesContent;
+  const cardBody = (markup) => titleOnly ? "" : markup;
+  const cardLayouts = usesSchengenLayout ? {
     summary: { left: 0, top: 0, width: 33, height: 22, zIndex: 1 },
     prices: { left: 35, top: 0, width: 29, height: 22, zIndex: 2 },
     requirements: { left: 66, top: 0, width: 31, height: 32, zIndex: 3 },
@@ -1299,10 +1321,10 @@ function renderSheet(key) {
     const layout = cardLayouts[name];
     return `left: ${layout.left}%; top: ${layout.top}%; width: ${layout.width}%; height: ${layout.height}%; z-index: ${layout.zIndex};`;
   };
-  const typesSection = hasTypes ? `
+  const typesSection = usesSchengenLayout ? `
       <section class="section-card types-section" style="${cardStyle("types")}">
-        ${editableText("3. Tipos de visado Schengen", "h2")}
-        ${listItems(service.types)}
+        ${editableText(service.typesTitle || "3. Tipos de visado Schengen", "h2")}
+        ${cardBody(listItems(service.types || []))}
       </section>
   ` : "";
 
@@ -1322,35 +1344,35 @@ function renderSheet(key) {
         <div class="sheet-grid free-canvas">
       <section class="section-card summary-section" style="${cardStyle("summary")}">
         ${editableText("1. Resumen del servicio", "h2")}
-        ${tableRows(service.summary, "Campo", "Información", "info-table")}
+        ${cardBody(tableRows(service.summary, "Campo", "Información", "info-table"))}
       </section>
 
       <section class="section-card prices-section" style="${cardStyle("prices")}">
         ${editableText("2. Precios y promociones", "h2")}
-        ${tableRows(service.prices, "Concepto", "Valor", "info-table price-table")}
-        ${listItems(service.promos)}
+        ${cardBody(tableRows(service.prices, "Concepto", "Valor", "info-table price-table"))}
+        ${cardBody(listItems(service.promos))}
       </section>
 
       <section class="section-card requirements-section" style="${cardStyle("requirements")}">
-        ${editableText(hasTypes ? "4. Requisitos" : "3. Requisitos", "h2")}
-        ${listItems(service.requirements)}
+        ${editableText(usesSchengenLayout ? "4. Requisitos" : "3. Requisitos", "h2")}
+        ${cardBody(listItems(service.requirements))}
       </section>
 
       ${typesSection}
 
       <section class="section-card includes-section" style="${cardStyle("includes")}">
-        ${editableText(hasTypes ? "5. ¿Qué incluye?" : "4. ¿Qué incluye?", "h2")}
-        ${listItems(service.includes)}
+        ${editableText(usesSchengenLayout ? "5. ¿Qué incluye?" : "4. ¿Qué incluye?", "h2")}
+        ${cardBody(listItems(service.includes))}
       </section>
 
       <section class="section-card process-section" style="${cardStyle("process")}">
-        ${editableText(hasTypes ? "6. Proceso del servicio" : "5. Proceso del servicio", "h2")}
-        ${tableRows(service.process, "Etapa", "Tiempo", "process-table")}
+        ${editableText(usesSchengenLayout ? "6. Proceso del servicio" : "5. Proceso del servicio", "h2")}
+        ${cardBody(tableRows(service.process, "Etapa", "Tiempo", "process-table"))}
       </section>
 
       <section class="section-card notes-section" style="${cardStyle("notes")}">
-        ${editableText(hasTypes ? "7. Entregables y observaciones" : "6. Entregables y observaciones", "h2")}
-        <div class="notes">
+        ${editableText(usesSchengenLayout ? "7. Entregables y observaciones" : "6. Entregables y observaciones", "h2")}
+        ${cardBody(`<div class="notes">
           <div>
             ${editableText("Entregables", "h2")}
             ${listItems(service.deliverables)}
@@ -1359,7 +1381,7 @@ function renderSheet(key) {
             ${editableText("Observaciones", "h2")}
             ${listItems(service.observations)}
           </div>
-        </div>
+        </div>`)}
       </section>
         </div>
       </section>
