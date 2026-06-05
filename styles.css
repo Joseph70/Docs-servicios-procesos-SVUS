@@ -16,6 +16,9 @@
   --line: #d7e1eb;
   --panel-line: rgba(137, 163, 199, 0.35);
   --shadow: 0 16px 38px rgba(15, 63, 105, 0.13);
+  --sheet-layer: 1;
+  --topbar-layer: 2000;
+  --sidebar-layer: 2100;
 }
 
 * {
@@ -57,7 +60,7 @@ button {
   top: 0;
   left: 0;
   overflow-y: auto;
-  z-index: 30;
+  z-index: var(--sidebar-layer);
   border-right: 1px solid rgba(255, 255, 255, 0.18);
 }
 
@@ -144,6 +147,9 @@ button {
 }
 
 .workspace {
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
   min-width: 0;
   max-width: calc(100vw - var(--sidebar-width));
   margin-left: var(--sidebar-width);
@@ -156,7 +162,7 @@ button {
   top: 0;
   left: var(--sidebar-width);
   right: 0;
-  z-index: 24;
+  z-index: var(--topbar-layer);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -165,10 +171,11 @@ button {
   margin: 0;
   padding: 10px 14px 9px;
   background:
-    linear-gradient(135deg, rgba(255, 240, 199, 0.88), rgba(255, 255, 255, 0.78) 34%),
-    linear-gradient(140deg, rgba(49, 86, 138, 0.12), rgba(137, 163, 199, 0.2) 58%, rgba(44, 133, 172, 0.11)),
+    linear-gradient(135deg, rgba(255, 240, 199, 0.98), rgba(255, 255, 255, 0.96) 34%),
+    linear-gradient(140deg, rgba(49, 86, 138, 0.16), rgba(137, 163, 199, 0.24) 58%, rgba(44, 133, 172, 0.14)),
     var(--bg);
   border-bottom: 1px solid rgba(137, 163, 199, 0.26);
+  box-shadow: 0 10px 24px rgba(15, 63, 105, 0.12);
   backdrop-filter: blur(12px);
 }
 
@@ -246,6 +253,9 @@ button {
 }
 
 .sheet-shell {
+  position: relative;
+  z-index: var(--sheet-layer);
+  isolation: isolate;
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
@@ -254,6 +264,8 @@ button {
 }
 
 .service-sheet {
+  position: relative;
+  z-index: 0;
   width: min(1180px, 100%);
   max-width: 100%;
   min-height: 0;
@@ -859,9 +871,10 @@ body.dark {
 
 body.dark .topbar {
   background:
-    linear-gradient(135deg, rgba(240, 199, 83, 0.1), rgba(255, 255, 255, 0) 34%),
-    linear-gradient(145deg, rgba(2, 17, 29, 0.96), rgba(3, 24, 39, 0.96) 58%, rgba(6, 36, 58, 0.96));
+    linear-gradient(135deg, rgba(240, 199, 83, 0.12), rgba(255, 255, 255, 0) 34%),
+    linear-gradient(145deg, #02111d, #031827 58%, #06243a);
   border-bottom-color: rgba(255, 240, 199, 0.2);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
 }
 
 body.dark .section-card {
