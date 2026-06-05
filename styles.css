@@ -449,7 +449,7 @@ button {
   min-height: 0;
   min-width: 120px;
   box-shadow: 0 8px 18px rgba(15, 63, 105, 0.06);
-  cursor: move;
+  cursor: default;
   overflow: auto;
   scrollbar-width: thin;
   touch-action: none;
@@ -461,13 +461,9 @@ button {
   box-shadow: 0 10px 22px rgba(15, 63, 105, 0.1);
 }
 
-.section-card:active {
-  cursor: grabbing;
-}
-
 .section-card.dragging {
   opacity: 0.55;
-  cursor: move;
+  cursor: grabbing;
   transform: scale(0.985);
 }
 
@@ -477,27 +473,7 @@ button {
 }
 
 .card-move-handle {
-  position: absolute;
-  right: 27px;
-  bottom: 5px;
-  display: none;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border: 1px solid rgba(49, 86, 138, 0.3);
-  border-radius: 6px;
-  background:
-    radial-gradient(circle, var(--blue-mid) 1.3px, transparent 1.5px) 3px 3px / 6px 6px,
-    linear-gradient(135deg, #fff8df, var(--gold));
-  box-shadow: 0 5px 12px rgba(184, 134, 15, 0.16);
-  cursor: move;
-  opacity: 0.84;
-  z-index: 5;
-}
-
-.card-move-handle:hover {
-  opacity: 1;
-  box-shadow: 0 0 14px rgba(240, 199, 83, 0.58);
+  display: none !important;
 }
 
 .resize-handle {
@@ -702,7 +678,7 @@ body.editing .sheet-grid {
 }
 
 body.editing .section-card {
-  cursor: default !important;
+  cursor: grab !important;
 }
 
 body.editing .section-card:hover {
@@ -720,27 +696,17 @@ body.editing .section-card.card-selected {
     0 12px 26px rgba(15, 63, 105, 0.14);
 }
 
-body.editing .section-card :is(.editable, .editable *, .line-editable, .line-editable *, td, th, li, p, h2, span) {
+body.editing .section-card.dragging {
+  cursor: grabbing !important;
+}
+
+body.editing .section-card :is(.editable, .editable *, .line-editable, .line-editable *, table, thead, tbody, tr, td, th, ul, ol, li, p, h1, h2, h3, h4, h5, h6, span, strong, em, b, i) {
   cursor: text !important;
 }
 
 body.editing .resize-handle {
   opacity: 0.86;
   cursor: nwse-resize !important;
-}
-
-body.editing .card-move-handle {
-  display: none;
-}
-
-body.editing .section-card:hover .card-move-handle,
-body.editing .section-card.card-selected .card-move-handle {
-  display: inline-flex;
-}
-
-body.editing .card-move-handle,
-body.editing .card-move-handle * {
-  cursor: move !important;
 }
 
 body.editing .line-editable {
@@ -832,49 +798,6 @@ body.editing .line-editable td:first-child::before {
   box-shadow: 0 0 14px rgba(240, 199, 83, 0.52);
 }
 
-.card-quick-toolbar {
-  position: fixed;
-  z-index: 90;
-  display: none;
-  align-items: center;
-  gap: 5px;
-  padding: 5px;
-  border: 1px solid rgba(240, 199, 83, 0.62);
-  border-radius: 8px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 240, 199, 0.92)),
-    var(--sheet);
-  box-shadow: 0 14px 30px rgba(15, 63, 105, 0.18), 0 0 18px rgba(240, 199, 83, 0.18);
-  backdrop-filter: blur(10px);
-}
-
-.card-quick-toolbar.is-visible {
-  display: flex;
-}
-
-.card-quick-toolbar button {
-  min-height: 27px;
-  border: 1px solid rgba(184, 134, 15, 0.42);
-  border-radius: 6px;
-  padding: 4px 8px;
-  background: linear-gradient(135deg, #fff8df, var(--gold));
-  color: var(--blue-dark);
-  font-size: 0.68rem;
-  font-weight: 900;
-  cursor: pointer;
-}
-
-.card-quick-toolbar button:hover {
-  filter: brightness(1.04);
-  box-shadow: 0 0 12px rgba(240, 199, 83, 0.48);
-}
-
-.card-quick-toolbar [data-card-action="delete"] {
-  border-color: rgba(239, 68, 68, 0.32);
-  background: linear-gradient(135deg, #fff1f1, #ffd7d7);
-  color: #8f1d1d;
-}
-
 .alignment-guide {
   position: absolute;
   z-index: 80;
@@ -939,13 +862,6 @@ body.dark .topbar {
     linear-gradient(135deg, rgba(240, 199, 83, 0.1), rgba(255, 255, 255, 0) 34%),
     linear-gradient(145deg, rgba(2, 17, 29, 0.96), rgba(3, 24, 39, 0.96) 58%, rgba(6, 36, 58, 0.96));
   border-bottom-color: rgba(255, 240, 199, 0.2);
-}
-
-body.dark .card-quick-toolbar {
-  background:
-    linear-gradient(135deg, rgba(9, 42, 68, 0.98), rgba(5, 30, 50, 0.96));
-  border-color: rgba(255, 240, 199, 0.44);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.3), 0 0 18px rgba(240, 199, 83, 0.16);
 }
 
 body.dark .section-card {
@@ -1113,7 +1029,6 @@ body.dark .icon-sun {
   }
 
   .line-add-button,
-  .card-quick-toolbar,
   .alignment-guide,
   .add-page-button {
     display: none !important;
