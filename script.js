@@ -193,6 +193,7 @@ let draggedLine = null;
 let selectedLine = null;
 let selectedCard = null;
 let copiedCardMarkup = "";
+let cardToolbar = null;
 const dragReadyCards = new WeakSet();
 const undoHistory = {};
 const maxUndoSteps = 40;
@@ -315,16 +316,215 @@ function clearSelectedLine() {
 function clearSelectedCard() {
   selectedCard?.classList.remove("card-selected");
   selectedCard = null;
+  updateCardToolbar();
 }
 
 function selectCard(card) {
   if (!card || selectedCard === card) {
+    updateCardToolbar();
     return;
   }
 
   clearSelectedCard();
   selectedCard = card;
   selectedCard.classList.add("card-selected");
+  updateCardToolbar();
+}
+
+function ensureCardToolbar() {
+  if (cardToolbar) {
+    return cardToolbar;
+  }
+
+  cardToolbar = document.createElement("div");
+  cardToolbar.className = "card-quick-toolbar";
+  cardToolbar.setAttribute("aria-label", "Acciones del recuadro seleccionado");
+  cardToolbar.innerHTML = `
+    <button type="button" data-card-action="move" title="Mover recuadro">Mover</button>
+    <button type="button" data-card-action="edit" title="Editar texto">Editar</button>
+    <button type="button" data-card-action="duplicate" title="Duplicar recuadro">Duplicar</button>
+    <button type="button" data-card-action="delete" title="Eliminar recuadro">Eliminar</button>
+  `;
+  document.body.appendChild(cardToolbar);
+  return cardToolbar;
+}
+
+function updateCardToolbar() {
+  const toolbar = ensureCardToolbar();
+
+  if (!editMode || !selectedCard?.isConnected) {
+    toolbar.classList.remove("is-visible");
+    return;
+  }
+
+  const rect = selectedCard.getBoundingClientRect();
+  const toolbarWidth = toolbar.offsetWidth || 310;
+  const toolbarHeight = toolbar.offsetHeight || 34;
+  const left = clamp(rect.left + rect.width / 2 - toolbarWidth / 2, 8, window.innerWidth - toolbarWidth - 8);
+  const top = rect.top > toolbarHeight + 12 ? rect.top - toolbarHeight - 8 : rect.top + 8;
+
+  toolbar.style.left = `${left}px`;
+  toolbar.style.top = `${Math.max(8, top)}px`;
+  toolbar.classList.add("is-visible");
+}
+
+function focusCardForEditing(card = selectedCard) {
+  if (!card) {
+    return;
+  }
+
+  if (!editMode) {
+    setEditMode(true);
+  }
+
+  const target = card.querySelector(".editable");
+  if (target) {
+    focusEditable(target);
+  }
+}
+
+function duplicateCard(card = selectedCard) {
+  if (!card?.isConnected) {
+    return null;
+  }
+
+  const targetCanvas = card.closest(".free-canvas");
+  if (!targetCanvas) {
+    return null;
+  }
+
+  pushUndoState();
+  const clone = cleanCardForCopy(card);
+  delete clone.dataset.svusCard;
+  const sourceLeft = stylePercent(card, "left");
+  const sourceTop = stylePercent(card, "top");
+  const width = stylePercent(card, "width", 24);
+  const height = stylePercent(card, "height", 24);
+
+  clone.style.left = `${clamp(sourceLeft + 3, 0, Math.max(0, 100 - width))}%`;
+  clone.style.top = `${clamp(sourceTop + 3, 0, Math.max(0, 100 - height))}%`;
+  clone.style.width = `${width}%`;
+  clone.style.height = `${height}%`;
+
+  makeCardContentEditable(clone);
+  targetCanvas.appendChild(clone);
+  bringCardToFront(clone);
+  setupDraggableSections();
+  refreshLineEditingTools();
+  setEditMode(true);
+  selectCard(clone);
+  saveButton.disabled = false;
+  persistCurrentSheet();
+  return clone;
+}
+
+function deleteSelectedCard() {
+  if (!editMode || !selectedCard?.isConnected) {
+    return false;
+  }
+
+  pushUndoState();
+  const cardToDelete = selectedCard;
+  clearSelectedCard();
+  cardToDelete.remove();
+  saveButton.disabled = false;
+  persistCurrentSheet();
+  return true;
+}
+
+function ensureAlignmentGuides(canvas) {
+  let vertical = canvas.querySelector(":scope > .alignment-guide.vertical");
+  let horizontal = canvas.querySelector(":scope > .alignment-guide.horizontal");
+
+  if (!vertical) {
+    vertical = document.createElement("div");
+    vertical.className = "alignment-guide vertical";
+    vertical.hidden = true;
+    canvas.appendChild(vertical);
+  }
+
+  if (!horizontal) {
+    horizontal = document.createElement("div");
+    horizontal.className = "alignment-guide horizontal";
+    horizontal.hidden = true;
+    canvas.appendChild(horizontal);
+  }
+
+  return { vertical, horizontal };
+}
+
+function hideAlignmentGuides(root = sheet) {
+  root.querySelectorAll(".alignment-guide").forEach((guide) => {
+    guide.hidden = true;
+    guide.style.left = "";
+    guide.style.top = "";
+  });
+}
+
+function nearestGuide(points, targets, threshold = 1.15) {
+  let nearest = null;
+
+  points.forEach((point) => {
+    targets.forEach((target) => {
+      const distance = Math.abs(point - target);
+      if (distance <= threshold && (!nearest || distance < nearest.distance)) {
+        nearest = { value: target, distance };
+      }
+    });
+  });
+
+  return nearest;
+}
+
+function updateAlignmentGuides(card, canvas) {
+  if (!canvas || !card?.isConnected) {
+    hideAlignmentGuides();
+    return;
+  }
+
+  const { vertical, horizontal } = ensureAlignmentGuides(canvas);
+  const canvasRect = canvas.getBoundingClientRect();
+  const cardRect = card.getBoundingClientRect();
+  const left = stylePercent(card, "left");
+  const top = stylePercent(card, "top");
+  const width = cardRect.width / canvasRect.width * 100;
+  const height = cardRect.height / canvasRect.height * 100;
+  const xPoints = [left, left + width / 2, left + width];
+  const yPoints = [top, top + height / 2, top + height];
+  const xTargets = [0, 50, 100];
+  const yTargets = [0, 50, 100];
+
+  canvas.querySelectorAll(".section-card").forEach((other) => {
+    if (other === card) {
+      return;
+    }
+
+    const otherRect = other.getBoundingClientRect();
+    const otherLeft = stylePercent(other, "left");
+    const otherTop = stylePercent(other, "top");
+    const otherWidth = otherRect.width / canvasRect.width * 100;
+    const otherHeight = otherRect.height / canvasRect.height * 100;
+
+    xTargets.push(otherLeft, otherLeft + otherWidth / 2, otherLeft + otherWidth);
+    yTargets.push(otherTop, otherTop + otherHeight / 2, otherTop + otherHeight);
+  });
+
+  const xGuide = nearestGuide(xPoints, xTargets);
+  const yGuide = nearestGuide(yPoints, yTargets);
+
+  if (xGuide) {
+    vertical.hidden = false;
+    vertical.style.left = `${clamp(xGuide.value, 0, 100)}%`;
+  } else {
+    vertical.hidden = true;
+  }
+
+  if (yGuide) {
+    horizontal.hidden = false;
+    horizontal.style.top = `${clamp(yGuide.value, 0, 100)}%`;
+  } else {
+    horizontal.hidden = true;
+  }
 }
 
 function selectLine(line) {
@@ -690,6 +890,7 @@ function stripLineEditingControls(root = sheet) {
   root.querySelectorAll(".line-add-button").forEach((button) => button.remove());
   if (root !== sheet) {
     root.querySelectorAll(".card-move-handle").forEach((button) => button.remove());
+    root.querySelectorAll(".alignment-guide").forEach((guide) => guide.remove());
   }
   root.querySelectorAll(".card-selected").forEach((card) => card.classList.remove("card-selected"));
   root.querySelectorAll("[data-svus-card]").forEach((card) => card.removeAttribute("data-svus-card"));
@@ -923,7 +1124,7 @@ function bringCardToFront(card) {
   card.style.zIndex = String(maxZ + 1);
 }
 
-function startCardMove(event, card, pointerTarget = card) {
+function startCardMove(event, card, pointerTarget = card, options = {}) {
   let canvas = card.closest(".free-canvas");
   if (!canvas) {
     return;
@@ -936,8 +1137,13 @@ function startCardMove(event, card, pointerTarget = card) {
   bringCardToFront(card);
   card.classList.add("dragging");
   document.body.classList.add("moving-card");
+  ensureCardToolbar().classList.remove("is-visible");
 
   const cardRect = card.getBoundingClientRect();
+  const startLeft = stylePercent(card, "left");
+  const startTop = stylePercent(card, "top");
+  const startPointerX = event.clientX;
+  const startPointerY = event.clientY;
   const pointerOffsetX = event.clientX - cardRect.left;
   const pointerOffsetY = event.clientY - cardRect.top;
   pointerTarget.setPointerCapture(event.pointerId);
@@ -947,6 +1153,7 @@ function startCardMove(event, card, pointerTarget = card) {
       .find((element) => element.classList?.contains("free-canvas"));
 
     if (targetCanvas && targetCanvas !== canvas) {
+      hideAlignmentGuides();
       canvas = targetCanvas;
       canvas.appendChild(card);
     }
@@ -954,10 +1161,15 @@ function startCardMove(event, card, pointerTarget = card) {
     const canvasRect = canvas.getBoundingClientRect();
     const widthPercent = card.getBoundingClientRect().width / canvasRect.width * 100;
     const heightPercent = card.getBoundingClientRect().height / canvasRect.height * 100;
-    const nextLeft = (moveEvent.clientX - canvasRect.left - pointerOffsetX) / canvasRect.width * 100;
-    const nextTop = (moveEvent.clientY - canvasRect.top - pointerOffsetY) / canvasRect.height * 100;
+    const nextLeft = options.relative
+      ? startLeft + (moveEvent.clientX - startPointerX) / canvasRect.width * 100
+      : (moveEvent.clientX - canvasRect.left - pointerOffsetX) / canvasRect.width * 100;
+    const nextTop = options.relative
+      ? startTop + (moveEvent.clientY - startPointerY) / canvasRect.height * 100
+      : (moveEvent.clientY - canvasRect.top - pointerOffsetY) / canvasRect.height * 100;
     card.style.left = `${clamp(nextLeft, 0, Math.max(0, 100 - widthPercent))}%`;
     card.style.top = `${clamp(nextTop, 0, Math.max(0, 100 - heightPercent))}%`;
+    updateAlignmentGuides(card, canvas);
   };
 
   const onPointerUp = () => {
@@ -966,6 +1178,7 @@ function startCardMove(event, card, pointerTarget = card) {
     pointerTarget.removeEventListener("pointercancel", onPointerUp);
     card.classList.remove("dragging");
     document.body.classList.remove("moving-card");
+    hideAlignmentGuides();
     draggedSection = null;
     if (pointerTarget.hasPointerCapture(event.pointerId)) {
       pointerTarget.releasePointerCapture(event.pointerId);
@@ -976,6 +1189,7 @@ function startCardMove(event, card, pointerTarget = card) {
     } else {
       saveSheetLayout();
     }
+    updateCardToolbar();
   };
 
   pointerTarget.addEventListener("pointermove", onPointerMove);
@@ -1055,6 +1269,7 @@ function setupDraggableSections() {
         const nextHeight = startHeight + (moveEvent.clientY - startY) / currentCanvasRect.height * 100;
         card.style.width = `${clamp(nextWidth, 12, Math.max(12, 100 - left))}%`;
         card.style.height = `${clamp(nextHeight, 12, Math.max(12, 100 - top))}%`;
+        updateAlignmentGuides(card, canvas);
       };
 
       const onPointerUp = () => {
@@ -1063,6 +1278,7 @@ function setupDraggableSections() {
         resizeHandle.removeEventListener("pointercancel", onPointerUp);
         card.classList.remove("resizing");
         document.body.classList.remove("resizing-card");
+        hideAlignmentGuides();
         resizingSection = null;
         if (resizeHandle.hasPointerCapture(event.pointerId)) {
           resizeHandle.releasePointerCapture(event.pointerId);
@@ -1071,6 +1287,7 @@ function setupDraggableSections() {
           saveButton.disabled = false;
         }
         saveSheetLayout();
+        updateCardToolbar();
       };
 
       resizeHandle.addEventListener("pointermove", onPointerMove);
@@ -1291,6 +1508,24 @@ sheet.addEventListener("focusout", (event) => {
   }
 });
 
+sheet.addEventListener("dblclick", (event) => {
+  const card = event.target.closest(".section-card");
+  if (!card) {
+    return;
+  }
+
+  selectCard(card);
+  const editableTarget = event.target.closest(".editable") || card.querySelector(".editable");
+
+  if (!editMode) {
+    setEditMode(true);
+  }
+
+  if (editableTarget) {
+    focusEditable(editableTarget);
+  }
+});
+
 sheet.addEventListener("pointerdown", (event) => {
   if (!editMode) {
     return;
@@ -1322,6 +1557,38 @@ sheet.addEventListener("pointerdown", (event) => {
 
   if (document.activeElement instanceof HTMLElement) {
     document.activeElement.blur();
+  }
+});
+
+document.addEventListener("pointerdown", (event) => {
+  const actionButton = event.target.closest(".card-quick-toolbar [data-card-action]");
+  if (!actionButton || actionButton.dataset.cardAction !== "move" || !selectedCard?.isConnected) {
+    return;
+  }
+
+  event.stopPropagation();
+  startCardMove(event, selectedCard, actionButton, { relative: true });
+});
+
+document.addEventListener("click", (event) => {
+  const actionButton = event.target.closest(".card-quick-toolbar [data-card-action]");
+  if (!actionButton || !selectedCard?.isConnected) {
+    return;
+  }
+
+  event.preventDefault();
+  const action = actionButton.dataset.cardAction;
+
+  if (action === "edit") {
+    focusCardForEditing();
+  }
+
+  if (action === "duplicate") {
+    duplicateCard();
+  }
+
+  if (action === "delete") {
+    deleteSelectedCard();
   }
 });
 
@@ -1496,6 +1763,16 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
+  if (editMode && (event.key === "Delete" || event.code === "Delete") && selectedCard && !hasAnySelectedText()) {
+    const activeElement = document.activeElement;
+    const isEditingText = activeElement instanceof HTMLElement && activeElement.isContentEditable;
+
+    if (!isEditingText && deleteSelectedCard()) {
+      event.preventDefault();
+    }
+    return;
+  }
+
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && !event.shiftKey) {
     if (undoLastAction()) {
       event.preventDefault();
@@ -1526,6 +1803,8 @@ wordButton?.addEventListener("click", downloadWordDocument);
 
 window.addEventListener("beforeprint", preparePrintView);
 window.addEventListener("afterprint", restoreAfterPrint);
+window.addEventListener("scroll", updateCardToolbar, { passive: true });
+window.addEventListener("resize", updateCardToolbar);
 
 window.addEventListener("beforeunload", () => {
   if (sheet.innerHTML.trim()) {
