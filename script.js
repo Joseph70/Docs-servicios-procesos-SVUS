@@ -1561,6 +1561,11 @@ sheet.addEventListener("focusout", (event) => {
 sheet.addEventListener("dblclick", (event) => {
   const card = event.target.closest(".section-card");
   if (!card) {
+    if (event.target.closest(".sheet-grid, .sheet-page, .service-sheet")) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
     return;
   }
 
