@@ -196,17 +196,28 @@ services["visa-americana-f1"] = {
 
 const sheet = document.querySelector("#serviceSheet");
 const pageTitle = document.querySelector("#pageTitle");
-const serviceButtons = document.querySelectorAll(".service-button");
+const serviceMenu = document.querySelector("#serviceMenu");
+let serviceButtons = document.querySelectorAll(".service-button");
 const editButton = document.querySelector("#editButton");
 const saveButton = document.querySelector("#saveButton");
+const cancelButton = document.querySelector("#cancelButton");
+const undoButton = document.querySelector("#undoButton");
+const duplicateSheetButton = document.querySelector("#duplicateSheetButton");
+const restoreButton = document.querySelector("#restoreButton");
+const addCardButton = document.querySelector("#addCardButton");
+const duplicateCardButton = document.querySelector("#duplicateCardButton");
+const deleteSelectionButton = document.querySelector("#deleteSelectionButton");
 const themeToggle = document.querySelector("#themeToggle");
 const printButton = document.querySelector("#printButton");
 const wordButton = document.querySelector("#wordButton");
+const saveStatus = document.querySelector("#saveStatus");
 const lightLogoSrc = "svus-logo.png";
 const darkLogoSrc = "logo-blanco-transparente.png";
 const printLogoSrc = "logo-impresion-color.png";
 let activeService = "visa-americana";
 let editMode = false;
+let hasUnsavedChanges = false;
+let editBaselineMarkup = "";
 let draggedSection = null;
 let resizingSection = null;
 let draggedLine = null;
@@ -217,6 +228,9 @@ const dragReadyCards = new WeakSet();
 const undoHistory = {};
 const maxUndoSteps = 40;
 const wordMimeType = "application/msword;charset=utf-8";
+const backendBaseUrl = window.location.protocol === "file:" ? "http://localhost:4173" : "";
+let backendAvailable = false;
+let backendSaveTimer = null;
 
 const defaultLayouts = [
   { className: "summary-section", left: 0, top: 0, width: 34, height: 25 },
@@ -254,6 +268,161 @@ function serviceVersionStorageKey(key) {
   return `svus-sheet-version-${key}`;
 }
 
+function customServiceKeysStorageKey() {
+  return "svus-custom-service-keys";
+}
+
+function customServiceMetaStorageKey(key) {
+  return `svus-custom-service-meta-${key}`;
+}
+
+function readCustomServiceKeys() {
+  try {
+    const keys = JSON.parse(localStorage.getItem(customServiceKeysStorageKey()) || "[]");
+    return Array.isArray(keys) ? keys.filter((key) => typeof key === "string" && services[key]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCustomServiceKeys(keys) {
+  localStorage.setItem(customServiceKeysStorageKey(), JSON.stringify([...new Set(keys)]));
+}
+
+function registerCustomServices() {
+  try {
+    const keys = JSON.parse(localStorage.getItem(customServiceKeysStorageKey()) || "[]");
+    if (!Array.isArray(keys)) {
+      return;
+    }
+
+    keys.forEach((key) => {
+      const meta = JSON.parse(localStorage.getItem(customServiceMetaStorageKey(key)) || "{}");
+      if (!key || !meta?.title || services[key]) {
+        return;
+      }
+
+      services[key] = {
+        ...emptyService(meta.title),
+        version: meta.version || `custom-${key}`,
+        badge: meta.badge || "Servicio activo",
+        custom: true,
+        empty: false
+      };
+    });
+  } catch {
+    writeCustomServiceKeys([]);
+  }
+}
+
+function backendUrl(path) {
+  return `${backendBaseUrl}${path}`;
+}
+
+async function checkBackendConnection() {
+  if (!window.fetch) {
+    return false;
+  }
+
+  try {
+    const response = await fetch(backendUrl("/api/health"), { cache: "no-store" });
+    backendAvailable = response.ok;
+  } catch {
+    backendAvailable = false;
+  }
+
+  return backendAvailable;
+}
+
+function downloadBlob(html, fileName) {
+  const blob = new Blob([html], { type: wordMimeType });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  URL.revokeObjectURL(link.href);
+  link.remove();
+}
+
+function triggerDownload(url, fileName) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+function queueBackendSync(reason = "autosave") {
+  if (!window.fetch) {
+    return;
+  }
+
+  window.clearTimeout(backendSaveTimer);
+  backendSaveTimer = window.setTimeout(() => {
+    syncCurrentSheetToBackend(reason);
+  }, reason === "manual-save" ? 0 : 800);
+}
+
+async function syncCurrentSheetToBackend(reason = "autosave") {
+  const service = services[activeService];
+
+  if (!service) {
+    return false;
+  }
+
+  try {
+    const response = await fetch(backendUrl(`/api/services/${activeService}`), {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: pageTitle.textContent || service.title,
+        version: service.version || "",
+        markup: localStorage.getItem(serviceStorageKey(activeService)) || cleanSheetMarkup(),
+        wordHtml: localStorage.getItem(serviceWordStorageKey(activeService)) || buildWordDocumentHtml(),
+        source: reason
+      })
+    });
+
+    backendAvailable = response.ok;
+    return response.ok;
+  } catch {
+    backendAvailable = false;
+    return false;
+  }
+}
+
+async function hydrateServiceFromBackend(key) {
+  if (!window.fetch || localStorage.getItem(serviceStorageKey(key))) {
+    return;
+  }
+
+  try {
+    const response = await fetch(backendUrl(`/api/services/${key}`), { cache: "no-store" });
+    if (!response.ok) {
+      return;
+    }
+
+    const { service } = await response.json();
+    if (!service?.markup || activeService !== key || localStorage.getItem(serviceStorageKey(key))) {
+      return;
+    }
+
+    localStorage.setItem(serviceStorageKey(key), service.markup);
+    if (service.wordHtml) {
+      localStorage.setItem(serviceWordStorageKey(key), service.wordHtml);
+    }
+    if (services[key]?.version) {
+      localStorage.setItem(serviceVersionStorageKey(key), services[key].version);
+    }
+
+    renderSheet(key);
+  } catch {
+    backendAvailable = false;
+  }
+}
+
 function editableText(text, tag = "span") {
   return `<${tag} class="editable">${text}</${tag}>`;
 }
@@ -275,12 +444,104 @@ function listItems(items) {
   return `<ul class="list">${items.map((item) => `<li class="editable">${item}</li>`).join("")}</ul>`;
 }
 
+function storedServiceTitle(key) {
+  const storedMarkup = localStorage.getItem(serviceStorageKey(key));
+  if (!storedMarkup) {
+    return "";
+  }
+
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = storedMarkup;
+  return wrapper.querySelector(".sheet-title")?.textContent.trim() || "";
+}
+
+function displayServiceTitle(key) {
+  return storedServiceTitle(key) || services[key]?.title || key;
+}
+
+function renderServiceMenu() {
+  const keys = Object.keys(services);
+  serviceMenu.innerHTML = "";
+
+  keys.forEach((key) => {
+    const button = document.createElement("button");
+    button.className = `service-button${key === activeService ? " active" : ""}`;
+    button.type = "button";
+    button.dataset.service = key;
+    button.textContent = displayServiceTitle(key);
+    serviceMenu.appendChild(button);
+  });
+
+  serviceButtons = serviceMenu.querySelectorAll(".service-button");
+  serviceButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      selectService(button.dataset.service);
+    });
+  });
+}
+
+function setDirty(isDirty, message = "") {
+  hasUnsavedChanges = Boolean(isDirty);
+  document.body.classList.toggle("has-unsaved", hasUnsavedChanges);
+  saveButton.disabled = !editMode || !hasUnsavedChanges;
+  cancelButton.disabled = !editMode || !hasUnsavedChanges;
+
+  if (saveStatus) {
+    if (hasUnsavedChanges) {
+      saveStatus.textContent = message || "Cambios sin guardar";
+    } else if (editMode) {
+      saveStatus.textContent = "Modo edición";
+    } else {
+      saveStatus.textContent = "Modo lectura";
+    }
+  }
+
+  updateEditorActionButtons();
+}
+
+function markChanged(message = "Cambios sin guardar") {
+  setDirty(true, message);
+}
+
+function validateCurrentSheet() {
+  const errors = [];
+  const title = sheet.querySelector(".sheet-title")?.textContent.trim() || "";
+  const priceText = Array.from(sheet.querySelectorAll(".price-table td:last-child"))
+    .map((cell) => cell.textContent.trim())
+    .join(" ");
+  const timeText = Array.from(sheet.querySelectorAll(".process-table td:last-child, .info-table td"))
+    .map((cell) => cell.textContent.trim())
+    .join(" ");
+
+  if (!title) {
+    errors.push("nombre del servicio");
+  }
+  if (sheet.querySelector(".price-table") && !/(\$|usd|gratis|incluido|variable|\d)/i.test(priceText)) {
+    errors.push("precio");
+  }
+  if (sheet.querySelector(".process-table") && !/(min|día|dias|días|hora|semana|variable|\d)/i.test(timeText)) {
+    errors.push("tiempos");
+  }
+
+  sheet.classList.toggle("has-validation-error", errors.length > 0);
+
+  if (errors.length && saveStatus) {
+    saveStatus.textContent = `Revisar: ${errors.join(", ")}`;
+  }
+
+  return errors;
+}
+
 function setEditMode(enabled) {
+  if (enabled && !editMode) {
+    editBaselineMarkup = currentSnapshot();
+  }
+
   editMode = enabled;
   document.body.classList.toggle("editing", editMode);
   editButton.setAttribute("aria-pressed", String(editMode));
-  editButton.title = editMode ? "Salir de edición" : "Editar textos";
-  saveButton.disabled = !editMode;
+  editButton.title = editMode ? "Guardar y volver a lectura" : "Editar textos";
+  editButton.querySelector("span").textContent = editMode ? "Lectura" : "Editar";
 
   makeCardContentEditable(sheet);
 
@@ -296,11 +557,41 @@ function setEditMode(enabled) {
 
   refreshLineEditingTools();
   setupDraggableSections();
+  setDirty(hasUnsavedChanges && editMode);
 }
 
 function saveCurrentSheet() {
+  const validationErrors = validateCurrentSheet();
+  syncActiveServiceTitleFromSheet();
+
   setEditMode(false);
   persistCurrentSheet();
+  editBaselineMarkup = currentSnapshot();
+  setDirty(false);
+  if (validationErrors.length && saveStatus) {
+    saveStatus.textContent = `Guardado con aviso: revisar ${validationErrors.join(", ")}`;
+  }
+  renderServiceMenu();
+  queueBackendSync("manual-save");
+  return true;
+}
+
+function cancelCurrentEdits() {
+  if (!editMode || !editBaselineMarkup) {
+    return false;
+  }
+
+  clearSelectedLine();
+  clearSelectedCard();
+  sheet.innerHTML = editBaselineMarkup;
+  ensureServiceStatusButton();
+  arrangeExistingSections();
+  updateThemeLogos(sheet);
+  setEditMode(false);
+  setupDraggableSections();
+  persistCurrentSheet();
+  setDirty(false);
+  return true;
 }
 
 function saveSheetLayout() {
@@ -323,12 +614,28 @@ function pushUndoState() {
   if (history.length > maxUndoSteps) {
     history.shift();
   }
+
+  updateEditorActionButtons();
+}
+
+function updateEditorActionButtons() {
+  const hasSelectedCard = Boolean(selectedCard?.isConnected);
+  const hasSelectedLine = Boolean(selectedLine?.isConnected);
+  const hasUndo = Boolean(undoHistory[activeService]?.length);
+
+  undoButton.disabled = !editMode || !hasUndo;
+  addCardButton.disabled = !editMode;
+  duplicateCardButton.disabled = !editMode || !hasSelectedCard;
+  deleteSelectionButton.disabled = !editMode || (!hasSelectedCard && !hasSelectedLine);
+  cancelButton.disabled = !editMode || !hasUnsavedChanges;
+  restoreButton.disabled = Boolean(services[activeService]?.custom);
 }
 
 function undoLastAction() {
   const history = undoHistory[activeService] || [];
 
   if (!history.length) {
+    updateEditorActionButtons();
     return false;
   }
 
@@ -339,17 +646,20 @@ function undoLastAction() {
   setEditMode(editMode);
   setupDraggableSections();
   persistCurrentSheet();
+  updateEditorActionButtons();
   return true;
 }
 
 function clearSelectedLine() {
   selectedLine?.classList.remove("line-selected");
   selectedLine = null;
+  updateEditorActionButtons();
 }
 
 function clearSelectedCard() {
   selectedCard?.classList.remove("card-selected");
   selectedCard = null;
+  updateEditorActionButtons();
 }
 
 function selectCard(card) {
@@ -360,6 +670,7 @@ function selectCard(card) {
   clearSelectedCard();
   selectedCard = card;
   selectedCard.classList.add("card-selected");
+  updateEditorActionButtons();
 }
 
 function ensureAlignmentGuides(canvas) {
@@ -549,6 +860,7 @@ function selectLine(line) {
   clearSelectedLine();
   selectedLine = line;
   selectedLine.classList.add("line-selected");
+  updateEditorActionButtons();
 }
 
 function isCardMoveSurface(target, card) {
@@ -587,9 +899,10 @@ function deleteSelectedLine() {
   const lineToDelete = selectedLine;
   clearSelectedLine();
   lineToDelete.remove();
-  saveButton.disabled = false;
+  markChanged("Línea eliminada sin guardar");
   persistCurrentSheet();
   refreshLineEditingTools();
+  updateEditorActionButtons();
   return true;
 }
 
@@ -698,8 +1011,176 @@ function pasteCopiedCard(event) {
   refreshLineEditingTools();
   setEditMode(editMode);
   selectCard(card);
-  saveButton.disabled = false;
+  markChanged("Recuadro pegado sin guardar");
   persistCurrentSheet();
+  return true;
+}
+
+function targetCanvasForNewCard() {
+  ensureSheetPages();
+  return selectedCard?.closest(".free-canvas")
+    || sheet.querySelector(".sheet-page:last-child .free-canvas")
+    || sheet.querySelector(".free-canvas");
+}
+
+function positionCardNearSelection(card, sourceCard = selectedCard) {
+  const targetCanvas = targetCanvasForNewCard();
+
+  if (!targetCanvas) {
+    return false;
+  }
+
+  const fallbackIndex = targetCanvas.querySelectorAll(".section-card").length;
+  const sourceLeft = sourceCard?.isConnected ? stylePercent(sourceCard, "left") : 4 + (fallbackIndex % 4) * 4;
+  const sourceTop = sourceCard?.isConnected ? stylePercent(sourceCard, "top") : 4 + (fallbackIndex % 5) * 5;
+  const width = stylePercent(card, "width", sourceCard?.isConnected ? stylePercent(sourceCard, "width", 28) : 28);
+  const height = stylePercent(card, "height", sourceCard?.isConnected ? stylePercent(sourceCard, "height", 24) : 24);
+
+  card.style.left = `${clamp(sourceLeft + 3, 0, Math.max(0, 100 - width))}%`;
+  card.style.top = `${clamp(sourceTop + 3, 0, Math.max(0, 100 - height))}%`;
+  card.style.width = `${width}%`;
+  card.style.height = `${height}%`;
+  targetCanvas.appendChild(card);
+  return true;
+}
+
+function activateNewCard(card) {
+  makeCardContentEditable(card);
+  bringCardToFront(card);
+  setupDraggableSections();
+  refreshLineEditingTools();
+  setEditMode(editMode);
+  selectCard(card);
+  markChanged("Recuadro agregado sin guardar");
+  persistCurrentSheet();
+}
+
+function addBlankCard() {
+  if (!editMode) {
+    return false;
+  }
+
+  pushUndoState();
+  const card = document.createElement("section");
+  card.className = "section-card custom-section";
+  card.innerHTML = `
+    ${editableText("Nuevo recuadro", "h2")}
+    ${listItems(["Nuevo punto"])}
+  `;
+
+  if (!positionCardNearSelection(card)) {
+    return false;
+  }
+
+  activateNewCard(card);
+  focusEditable(card.querySelector(".editable"));
+  return true;
+}
+
+function duplicateSelectedCard() {
+  if (!editMode || !selectedCard?.isConnected) {
+    updateEditorActionButtons();
+    return false;
+  }
+
+  pushUndoState();
+  const sourceCard = selectedCard;
+  const card = cleanCardForCopy(sourceCard);
+  delete card.dataset.svusCard;
+
+  if (!positionCardNearSelection(card, sourceCard)) {
+    return false;
+  }
+
+  activateNewCard(card);
+  return true;
+}
+
+function deleteSelection() {
+  if (!editMode) {
+    return false;
+  }
+
+  if (selectedLine?.isConnected) {
+    return deleteSelectedLine();
+  }
+
+  if (!selectedCard?.isConnected) {
+    updateEditorActionButtons();
+    return false;
+  }
+
+  pushUndoState();
+  const card = selectedCard;
+  clearSelectedCard();
+  card.remove();
+  markChanged("Recuadro eliminado sin guardar");
+  persistCurrentSheet();
+  updateEditorActionButtons();
+  return true;
+}
+
+function uniqueCustomServiceKey(title) {
+  const base = `custom-${sanitizeFileName(title) || "ficha"}`;
+  let key = base;
+  let index = 2;
+
+  while (services[key]) {
+    key = `${base}-${index}`;
+    index += 1;
+  }
+
+  return key;
+}
+
+function duplicateCurrentSheet() {
+  if (editMode && hasUnsavedChanges && !saveCurrentSheet()) {
+    return false;
+  }
+
+  const sourceTitle = sheet.querySelector(".sheet-title")?.textContent.trim() || services[activeService].title;
+  const copyTitle = `${sourceTitle} - copia`;
+  const key = uniqueCustomServiceKey(copyTitle);
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = cleanSheetMarkup();
+  const title = wrapper.querySelector(".sheet-title");
+  if (title) {
+    title.textContent = copyTitle;
+  }
+
+  services[key] = {
+    ...emptyService(copyTitle),
+    version: `custom-${Date.now()}`,
+    badge: "Servicio activo",
+    custom: true,
+    empty: false
+  };
+
+  localStorage.setItem(serviceStorageKey(key), wrapper.innerHTML);
+  localStorage.setItem(customServiceMetaStorageKey(key), JSON.stringify({
+    title: copyTitle,
+    version: services[key].version,
+    badge: "Servicio activo"
+  }));
+  writeCustomServiceKeys([...readCustomServiceKeys(), key]);
+  selectService(key);
+  renderServiceMenu();
+  return true;
+}
+
+function restoreOriginalSheet() {
+  if (services[activeService]?.custom) {
+    return false;
+  }
+
+  localStorage.removeItem(serviceStorageKey(activeService));
+  localStorage.removeItem(serviceWordStorageKey(activeService));
+  localStorage.removeItem(serviceVersionStorageKey(activeService));
+  undoHistory[activeService] = [];
+  setDirty(false);
+  setEditMode(false);
+  renderSheet(activeService);
+  renderServiceMenu();
   return true;
 }
 
@@ -900,11 +1381,15 @@ function ensureSheetPages() {
 
 function migrateServiceMarkup(key, service) {
   const title = sheet.querySelector(".sheet-title");
-  if (title) {
+  if (title && !title.textContent.trim()) {
     title.textContent = service.title;
   }
 
   sheet.querySelectorAll(".editable").forEach((element) => {
+    if (element.classList.contains("sheet-title")) {
+      return;
+    }
+
     const originalText = element.textContent;
     let nextText = originalText;
 
@@ -920,6 +1405,23 @@ function migrateServiceMarkup(key, service) {
       element.textContent = nextText;
     }
   });
+}
+
+function syncActiveServiceTitleFromSheet() {
+  const title = sheet.querySelector(".sheet-title")?.textContent.trim();
+  if (!title || !services[activeService]) {
+    return;
+  }
+
+  services[activeService].title = title;
+  if (services[activeService].custom) {
+    localStorage.setItem(customServiceMetaStorageKey(activeService), JSON.stringify({
+      title,
+      version: services[activeService].version,
+      badge: sheet.querySelector(".sheet-badge")?.textContent.trim() || "Servicio activo"
+    }));
+  }
+  pageTitle.textContent = title;
 }
 
 function stripLineEditingControls(root = sheet) {
@@ -1007,17 +1509,34 @@ function buildWordDocumentHtml() {
   `;
 }
 
-function downloadWordDocument() {
+async function downloadWordDocument() {
   persistCurrentSheet();
   const fileName = `${sanitizeFileName(pageTitle.textContent)}.doc`;
-  const blob = new Blob([buildWordDocumentHtml()], { type: wordMimeType });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  URL.revokeObjectURL(link.href);
-  link.remove();
+  const html = buildWordDocumentHtml();
+
+  if (window.fetch && (backendAvailable || await checkBackendConnection())) {
+    try {
+      const response = await fetch(backendUrl("/api/exports/word"), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          serviceId: activeService,
+          title: pageTitle.textContent,
+          html
+        })
+      });
+
+      if (response.ok) {
+        const exportResult = await response.json();
+        triggerDownload(backendUrl(exportResult.url), exportResult.fileName || fileName);
+        return;
+      }
+    } catch {
+      backendAvailable = false;
+    }
+  }
+
+  downloadBlob(html, fileName);
 }
 
 function persistCurrentSheet() {
@@ -1027,6 +1546,7 @@ function persistCurrentSheet() {
   if (services[activeService]?.version) {
     localStorage.setItem(serviceVersionStorageKey(activeService), services[activeService].version);
   }
+  queueBackendSync();
 }
 
 function refreshLineEditingTools() {
@@ -1231,7 +1751,7 @@ function startCardMove(event, card, pointerTarget = card, options = {}) {
       pointerTarget.releasePointerCapture(event.pointerId);
     }
     if (editMode) {
-      saveButton.disabled = false;
+      markChanged("Ubicación actualizada sin guardar");
       persistCurrentSheet();
     } else {
       saveSheetLayout();
@@ -1329,7 +1849,7 @@ function setupDraggableSections() {
           resizeHandle.releasePointerCapture(event.pointerId);
         }
         if (editMode) {
-          saveButton.disabled = false;
+          markChanged("Tamaño actualizado sin guardar");
         }
         saveSheetLayout();
       };
@@ -1351,7 +1871,7 @@ function setupDraggableSections() {
         card.style.height = "";
       }
       if (editMode) {
-        saveButton.disabled = false;
+        markChanged("Tamaño restaurado sin guardar");
       }
       saveSheetLayout();
     });
@@ -1378,11 +1898,13 @@ function renderSheet(key) {
     stripLineEditingControls();
     ensureServiceStatusButton();
     migrateServiceMarkup(key, service);
+    syncActiveServiceTitleFromSheet();
     updateThemeLogos(sheet);
     arrangeExistingSections();
     setEditMode(editMode);
     setupDraggableSections();
     persistCurrentSheet();
+    hydrateServiceFromBackend(key);
     return;
   }
 
@@ -1400,7 +1922,9 @@ function renderSheet(key) {
     `;
     ensureSheetPages();
     updateThemeLogos(sheet);
+    syncActiveServiceTitleFromSheet();
     setEditMode(editMode);
+    hydrateServiceFromBackend(key);
     return;
   }
 
@@ -1499,22 +2023,38 @@ function renderSheet(key) {
   ensureServiceStatusButton();
   ensureSheetPages();
   updateThemeLogos(sheet);
+  syncActiveServiceTitleFromSheet();
   setEditMode(editMode);
   setupDraggableSections();
   normalizeCanvasLayout(sheet.querySelector(".free-canvas"));
+  hydrateServiceFromBackend(key);
 }
 
-serviceButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    if (editMode) {
-      saveCurrentSheet();
-    }
+function selectService(key, options = {}) {
+  if (!services[key]) {
+    return false;
+  }
 
-    serviceButtons.forEach((item) => item.classList.remove("active"));
-    button.classList.add("active");
-    renderSheet(button.dataset.service);
-  });
-});
+  if (editMode && hasUnsavedChanges) {
+    saveCurrentSheet();
+    if (hasUnsavedChanges) {
+      return false;
+    }
+  } else if (editMode) {
+    setEditMode(false);
+  }
+
+  serviceButtons.forEach((item) => item.classList.remove("active"));
+  renderSheet(key);
+  setDirty(false);
+
+  if (!options.skipMenuRender) {
+    renderServiceMenu();
+  }
+
+  serviceMenu.querySelector(`[data-service="${key}"]`)?.classList.add("active");
+  return true;
+}
 
 sheet.addEventListener("focusin", (event) => {
   if (!event.target.classList.contains("editable")) {
@@ -1534,7 +2074,7 @@ sheet.addEventListener("input", (event) => {
     return;
   }
 
-  saveButton.disabled = false;
+  markChanged("Texto editado sin guardar");
 });
 
 sheet.addEventListener("focusout", (event) => {
@@ -1554,6 +2094,7 @@ sheet.addEventListener("focusout", (event) => {
     if (history.length > maxUndoSteps) {
       history.shift();
     }
+    markChanged("Texto editado sin guardar");
     persistCurrentSheet();
   }
 });
@@ -1565,7 +2106,7 @@ sheet.addEventListener("dblclick", (event) => {
       event.preventDefault();
       event.stopPropagation();
       if (editMode) {
-        saveCurrentSheet();
+        cancelCurrentEdits();
       }
     }
 
@@ -1633,6 +2174,7 @@ sheet.addEventListener("click", (event) => {
   pages.insertAdjacentHTML("beforeend", sheetPageMarkup(nextIndex));
   ensureSheetPages();
   setupDraggableSections();
+  markChanged("Hoja agregada sin guardar");
   persistCurrentSheet();
   pages.lastElementChild.scrollIntoView({ behavior: "smooth", block: "nearest" });
 });
@@ -1690,7 +2232,7 @@ sheet.addEventListener("click", (event) => {
     focusEditable(row.querySelector(".editable"));
   }
 
-  saveButton.disabled = false;
+  markChanged("Elemento agregado sin guardar");
   persistCurrentSheet();
 });
 
@@ -1746,7 +2288,7 @@ sheet.addEventListener("drop", (event) => {
   clearLineDropMarkers();
   draggedLine.classList.remove("line-dragging");
   draggedLine = null;
-  saveButton.disabled = false;
+  markChanged("Orden actualizado sin guardar");
   persistCurrentSheet();
 });
 
@@ -1772,6 +2314,7 @@ sheet.addEventListener("click", (event) => {
   statusButton.setAttribute("aria-pressed", String(!nextInactive));
   statusButton.setAttribute("aria-label", nextInactive ? "Marcar servicio como activo" : "Marcar servicio como inactivo");
   statusButton.title = nextInactive ? "Cambiar a servicio activo" : "Cambiar a servicio inactivo";
+  markChanged("Estado actualizado sin guardar");
   persistCurrentSheet();
 });
 
@@ -1791,17 +2334,52 @@ document.addEventListener("keydown", (event) => {
 
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && !event.shiftKey) {
     if (undoLastAction()) {
+      markChanged("Cambio deshecho sin guardar");
       event.preventDefault();
     }
   }
 });
 
 editButton.addEventListener("click", () => {
-  setEditMode(!editMode);
+  if (editMode) {
+    saveCurrentSheet();
+  } else {
+    setEditMode(true);
+  }
 });
 
 saveButton.addEventListener("click", () => {
   saveCurrentSheet();
+});
+
+cancelButton.addEventListener("click", () => {
+  cancelCurrentEdits();
+});
+
+undoButton.addEventListener("click", () => {
+  if (undoLastAction()) {
+    markChanged("Cambio deshecho sin guardar");
+  }
+});
+
+duplicateSheetButton.addEventListener("click", () => {
+  duplicateCurrentSheet();
+});
+
+restoreButton.addEventListener("click", () => {
+  restoreOriginalSheet();
+});
+
+addCardButton.addEventListener("click", () => {
+  addBlankCard();
+});
+
+duplicateCardButton.addEventListener("click", () => {
+  duplicateSelectedCard();
+});
+
+deleteSelectionButton.addEventListener("click", () => {
+  deleteSelection();
 });
 
 themeToggle.addEventListener("click", () => {
@@ -1839,4 +2417,7 @@ if (localStorage.getItem("svus-theme") === "dark") {
 }
 
 updateThemeLogos();
+registerCustomServices();
+renderServiceMenu();
 renderSheet("visa-americana");
+setDirty(false);

@@ -1,6 +1,6 @@
 :root {
   --sidebar-width: 228px;
-  --topbar-height: 72px;
+  --topbar-height: 70px;
   --gold: #f0c753;
   --gold-title: #b8860f;
   --gold-soft: #fff0c7;
@@ -163,13 +163,14 @@ button {
   left: var(--sidebar-width);
   right: 0;
   z-index: var(--topbar-layer);
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto auto;
+  justify-content: stretch;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   min-height: var(--topbar-height);
   margin: 0;
-  padding: 10px 14px 9px;
+  padding: 8px 12px;
   background:
     linear-gradient(135deg, rgba(255, 240, 199, 0.98), rgba(255, 255, 255, 0.96) 34%),
     linear-gradient(140deg, rgba(49, 86, 138, 0.16), rgba(137, 163, 199, 0.24) 58%, rgba(44, 133, 172, 0.14)),
@@ -179,10 +180,14 @@ button {
   backdrop-filter: blur(12px);
 }
 
+.topbar > div:first-child {
+  min-width: 0;
+}
+
 .topbar p {
-  margin: 0 0 3px;
+  margin: 0 0 2px;
   color: var(--blue-mid);
-  font-size: 0.72rem;
+  font-size: 0.66rem;
   font-weight: 850;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -191,21 +196,54 @@ button {
 .topbar h1 {
   margin: 0;
   color: var(--gold-title);
-  font-size: clamp(1.25rem, 2vw, 1.75rem);
+  font-size: clamp(1.05rem, 1.7vw, 1.45rem);
   line-height: 1.1;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6), 0 0 16px rgba(240, 199, 83, 0.18);
 }
 
 .toolbar {
   display: flex;
-  gap: 7px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: nowrap;
   justify-content: flex-end;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.save-status {
+  justify-self: end;
+  margin: 0;
+  padding: 5px 8px;
+  border: 1px solid rgba(137, 163, 199, 0.28);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--blue-mid);
+  font-size: 0.64rem;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+body.has-unsaved .save-status {
+  color: #8a4f00;
+  background: rgba(255, 240, 199, 0.82);
+  border-color: rgba(240, 199, 83, 0.72);
+}
+
+body.has-unsaved .service-sheet {
+  border-top-color: #e8a317;
+  box-shadow:
+    var(--shadow),
+    0 0 0 3px rgba(240, 199, 83, 0.18);
 }
 
 .icon-button {
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   display: inline-grid;
   place-items: center;
   border-radius: 7px;
@@ -213,15 +251,37 @@ button {
 
 .edit-toggle {
   width: auto;
-  min-width: 88px;
+  min-width: 78px;
   grid-auto-flow: column;
-  gap: 7px;
-  padding: 0 11px;
+  gap: 6px;
+  padding: 0 9px;
   font-weight: 850;
 }
 
-.edit-toggle span {
+.edit-tool-button {
+  width: 34px;
+  min-width: 34px;
+  grid-auto-flow: row;
+  gap: 0;
+  padding: 0;
+  font-weight: 850;
+}
+
+.edit-toggle span,
+.edit-tool-button span {
   line-height: 1;
+}
+
+.edit-tool-button span {
+  display: none;
+}
+
+body:not(.editing) :is(#saveButton, #cancelButton, #undoButton, #addCardButton, #duplicateCardButton, #deleteSelectionButton) {
+  display: none;
+}
+
+body.editing :is(#themeToggle, #printButton, #wordButton, #duplicateSheetButton, #restoreButton) {
+  display: none;
 }
 
 .icon-button:disabled {
@@ -239,8 +299,8 @@ button {
 }
 
 .icon {
-  width: 19px;
-  height: 19px;
+  width: 18px;
+  height: 18px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
@@ -266,7 +326,7 @@ button {
 .service-sheet {
   position: relative;
   z-index: 0;
-  width: min(1180px, 100%);
+  width: min(1120px, 100%);
   max-width: 100%;
   min-height: 0;
   aspect-ratio: auto;
@@ -278,6 +338,10 @@ button {
   padding: 14px 16px;
   display: block;
   overflow: visible;
+}
+
+.service-sheet.has-validation-error {
+  border-top-color: #f59e0b;
 }
 
 .sheet-header {
@@ -369,8 +433,8 @@ button {
   position: relative;
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 9;
-  min-height: clamp(460px, 52vw, 720px);
+  aspect-ratio: 297 / 170;
+  min-height: clamp(470px, 48vw, 690px);
   border-radius: 10px;
   background:
     linear-gradient(rgba(137, 163, 199, 0.08) 1px, transparent 1px),
@@ -396,6 +460,12 @@ button {
 .sheet-page {
   display: grid;
   gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(137, 163, 199, 0.3);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(237, 243, 248, 0.42)),
+    var(--sheet);
 }
 
 .sheet-page-label {
@@ -461,11 +531,15 @@ button {
   min-height: 0;
   min-width: 120px;
   box-shadow: 0 8px 18px rgba(15, 63, 105, 0.06);
-  cursor: grab;
+  cursor: default;
   overflow: auto;
   scrollbar-width: thin;
   touch-action: none;
   transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+}
+
+body:not(.editing) .section-card :is(.editable, .editable *, .line-editable, .line-editable *, table, thead, tbody, tr, td, th, ul, ol, li, p, h1, h2, h3, h4, h5, h6, span, strong, em, b, i) {
+  cursor: default;
 }
 
 .section-card:hover {
@@ -503,6 +577,7 @@ button {
   border-radius: 5px;
   background: linear-gradient(135deg, transparent 0 36%, rgba(255, 240, 199, 0.65) 36% 48%, var(--gold) 48% 62%, rgba(15, 63, 105, 0.46) 62% 74%, transparent 74%);
   cursor: nwse-resize;
+  display: none;
   opacity: 0.58;
 }
 
@@ -721,6 +796,7 @@ body.editing .section-card :is(.editable, .editable *, .line-editable, .line-edi
 }
 
 body.editing .resize-handle {
+  display: block;
   opacity: 0.86;
   cursor: nwse-resize !important;
 }
@@ -973,14 +1049,26 @@ body.dark .icon-sun {
 
   .topbar {
     position: sticky;
+    grid-template-columns: 1fr;
     left: 0;
     right: auto;
     width: 100%;
     min-height: auto;
     margin: 0 0 8px;
     padding: 10px 0 9px;
-    align-items: flex-start;
+    align-items: start;
     top: 0;
+  }
+
+  .toolbar {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .save-status {
+    justify-self: start;
+    text-align: left;
   }
 
   .sheet-header,
@@ -993,12 +1081,35 @@ body.dark .icon-sun {
   }
 
   .sheet-grid {
-    aspect-ratio: 10 / 13;
-    min-height: 820px;
+    aspect-ratio: auto;
+    min-height: 900px;
   }
 
   .sheet-badge {
     justify-self: start;
+  }
+}
+
+@media (max-width: 560px) {
+  .service-menu {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar {
+    gap: 5px;
+  }
+
+  .icon-button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .edit-toggle {
+    min-width: 78px;
+  }
+
+  .edit-tool-button {
+    min-width: 36px;
   }
 }
 
@@ -1140,6 +1251,9 @@ body.dark .icon-sun {
     width: 284mm;
     display: block;
     padding: 0 3mm 3mm;
+    border: 0;
+    border-radius: 0;
+    background: #ffffff !important;
     overflow: hidden;
     break-inside: avoid;
     page-break-inside: avoid;
