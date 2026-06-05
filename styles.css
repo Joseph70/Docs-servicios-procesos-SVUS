@@ -47,12 +47,15 @@ button {
 
 .sidebar {
   width: 228px;
-  min-height: 100vh;
+  height: 100vh;
   padding: 18px 14px;
   background: linear-gradient(180deg, var(--blue-dark), var(--blue-mid) 72%, var(--blue-light));
   color: var(--white);
   position: sticky;
   top: 0;
+  align-self: flex-start;
+  overflow-y: auto;
+  z-index: 30;
   border-right: 1px solid rgba(255, 255, 255, 0.18);
 }
 
@@ -147,11 +150,21 @@ button {
 }
 
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 24;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 14px;
-  margin-bottom: 8px;
+  margin: -10px 0 8px;
+  padding: 10px 0 9px;
+  background:
+    linear-gradient(135deg, rgba(255, 240, 199, 0.88), rgba(255, 255, 255, 0.78) 34%),
+    linear-gradient(140deg, rgba(49, 86, 138, 0.12), rgba(137, 163, 199, 0.2) 58%, rgba(44, 133, 172, 0.11)),
+    var(--bg);
+  border-bottom: 1px solid rgba(137, 163, 199, 0.26);
+  backdrop-filter: blur(12px);
 }
 
 .topbar p {
@@ -686,8 +699,8 @@ body.editing .section-card:hover {
 }
 
 body.editing .resize-handle {
-  opacity: 0.28;
-  cursor: default !important;
+  opacity: 0.86;
+  cursor: nwse-resize !important;
 }
 
 body.editing .card-move-handle {
@@ -823,6 +836,13 @@ body.dark {
     linear-gradient(145deg, #02111d, #031827 58%, #06243a);
 }
 
+body.dark .topbar {
+  background:
+    linear-gradient(135deg, rgba(240, 199, 83, 0.1), rgba(255, 255, 255, 0) 34%),
+    linear-gradient(145deg, rgba(2, 17, 29, 0.96), rgba(3, 24, 39, 0.96) 58%, rgba(6, 36, 58, 0.96));
+  border-bottom-color: rgba(255, 240, 199, 0.2);
+}
+
 body.dark .section-card {
   border-color: rgba(137, 163, 199, 0.32);
   background: linear-gradient(180deg, rgba(9, 42, 68, 0.98), rgba(5, 30, 50, 0.96));
@@ -896,7 +916,11 @@ body.dark .icon-sun {
   .sidebar {
     width: 100%;
     min-height: auto;
-    position: static;
+    height: auto;
+    max-height: 48vh;
+    position: sticky;
+    top: 0;
+    overflow-y: auto;
   }
 
   .service-menu {
@@ -910,6 +934,7 @@ body.dark .icon-sun {
 
   .topbar {
     align-items: flex-start;
+    top: 0;
   }
 
   .sheet-header,

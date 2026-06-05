@@ -269,9 +269,7 @@ function saveCurrentSheet() {
 }
 
 function saveSheetLayout() {
-  if (!editMode) {
-    persistCurrentSheet();
-  }
+  persistCurrentSheet();
 }
 
 function currentSnapshot() {
@@ -1032,10 +1030,6 @@ function setupDraggableSections() {
     });
 
     resizeHandle.addEventListener("pointerdown", (event) => {
-      if (editMode) {
-        return;
-      }
-
       event.preventDefault();
       event.stopPropagation();
       pushUndoState();
@@ -1073,6 +1067,9 @@ function setupDraggableSections() {
         if (resizeHandle.hasPointerCapture(event.pointerId)) {
           resizeHandle.releasePointerCapture(event.pointerId);
         }
+        if (editMode) {
+          saveButton.disabled = false;
+        }
         saveSheetLayout();
       };
 
@@ -1091,6 +1088,9 @@ function setupDraggableSections() {
         card.style.height = `${defaultLayout.height}%`;
       } else {
         card.style.height = "";
+      }
+      if (editMode) {
+        saveButton.disabled = false;
       }
       saveSheetLayout();
     });
@@ -1526,6 +1526,18 @@ wordButton?.addEventListener("click", downloadWordDocument);
 
 window.addEventListener("beforeprint", preparePrintView);
 window.addEventListener("afterprint", restoreAfterPrint);
+
+window.addEventListener("beforeunload", () => {
+  if (sheet.innerHTML.trim()) {
+    persistCurrentSheet();
+  }
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden" && sheet.innerHTML.trim()) {
+    persistCurrentSheet();
+  }
+});
 
 if (localStorage.getItem("svus-theme") === "dark") {
   document.body.classList.add("dark");
