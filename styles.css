@@ -1,4 +1,6 @@
 :root {
+  --sidebar-width: 228px;
+  --topbar-height: 72px;
   --gold: #f0c753;
   --gold-title: #b8860f;
   --gold-soft: #fff0c7;
@@ -28,7 +30,7 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
-  display: flex;
+  display: block;
   background:
     linear-gradient(135deg, rgba(255, 240, 199, 0.55), rgba(255, 255, 255, 0) 34%),
     linear-gradient(140deg, rgba(49, 86, 138, 0.14), rgba(137, 163, 199, 0.22) 58%, rgba(44, 133, 172, 0.13)),
@@ -46,14 +48,14 @@ button {
 }
 
 .sidebar {
-  width: 228px;
+  width: var(--sidebar-width);
   height: 100vh;
   padding: 18px 14px;
   background: linear-gradient(180deg, var(--blue-dark), var(--blue-mid) 72%, var(--blue-light));
   color: var(--white);
-  position: sticky;
+  position: fixed;
   top: 0;
-  align-self: flex-start;
+  left: 0;
   overflow-y: auto;
   z-index: 30;
   border-right: 1px solid rgba(255, 255, 255, 0.18);
@@ -142,23 +144,26 @@ button {
 }
 
 .workspace {
-  flex: 1;
   min-width: 0;
-  max-width: calc(100vw - 228px);
-  padding: 10px 14px 14px;
+  max-width: calc(100vw - var(--sidebar-width));
+  margin-left: var(--sidebar-width);
+  padding: calc(var(--topbar-height) + 10px) 14px 14px;
   overflow-x: hidden;
 }
 
 .topbar {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: var(--sidebar-width);
+  right: 0;
   z-index: 24;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 14px;
-  margin: -10px 0 8px;
-  padding: 10px 0 9px;
+  min-height: var(--topbar-height);
+  margin: 0;
+  padding: 10px 14px 9px;
   background:
     linear-gradient(135deg, rgba(255, 240, 199, 0.88), rgba(255, 255, 255, 0.78) 34%),
     linear-gradient(140deg, rgba(49, 86, 138, 0.12), rgba(137, 163, 199, 0.2) 58%, rgba(44, 133, 172, 0.11)),
@@ -929,10 +934,18 @@ body.dark .icon-sun {
 
   .workspace {
     padding: 16px 12px 22px;
+    margin-left: 0;
     max-width: 100%;
   }
 
   .topbar {
+    position: sticky;
+    left: 0;
+    right: auto;
+    width: 100%;
+    min-height: auto;
+    margin: 0 0 8px;
+    padding: 10px 0 9px;
     align-items: flex-start;
     top: 0;
   }
@@ -1024,6 +1037,7 @@ body.dark .icon-sun {
   .workspace,
   .sheet-shell {
     padding: 0;
+    margin-left: 0;
     overflow: visible;
     width: 100%;
     height: auto;
